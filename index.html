@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,35 +17,41 @@
   <script src="js/compras.js" defer></script>
   <script src="js/app.js" defer></script>
 </head>
-
 <body>
-  <div id="loading-global" class="loading-global hidden" role="status" aria-live="polite" aria-busy="false"><div class="loading-panel"><span class="loading-spinner" aria-hidden="true"></span><span id="loading-texto">Guardando...</span></div></div>
+  <div id="loading-global" class="loading-global hidden" role="status" aria-live="polite" aria-busy="false">
+    <div class="loading-panel">
+      <span class="loading-spinner" aria-hidden="true"></span>
+      <span id="loading-texto">Guardando...</span>
+    </div>
+  </div>
 
   <header class="main-header">
     <div class="header-brand">
       <span class="brand-logo">🌙</span>
       <div>
         <h1 class="brand-title">Papel y Luna</h1>
-        <p class="brand-sub">Sistema de Facturación POS</p>
+        <p class="brand-sub">Sistema de Facturación POS — <span id="session-user-badge">Sin sesión</span></p>
       </div>
     </div>
-
     <nav class="header-nav">
       <button type="button" id="btn-nav-pos" class="nav-btn active">POS / Factura</button>
-      <button type="button" id="btn-nav-productos" class="nav-btn">Productos</button>
       <button type="button" id="btn-nav-historial" class="nav-btn">Historial</button>
       <button type="button" id="btn-nav-clientes" class="nav-btn">Clientes</button>
-      <button type="button" id="btn-nav-proveedores" class="nav-btn">Proveedores</button>
-      <button type="button" id="btn-nav-compras" class="nav-btn">Compras</button>
-      <button type="button" id="btn-nav-categorias" class="nav-btn">Categorías</button>
+      <button type="button" id="btn-nav-faltantes" class="nav-btn">Faltantes</button>
+      <!-- Vistas exclusivas de Administrador -->
+      <button type="button" id="btn-nav-productos" class="nav-btn admin-only">Productos</button>
+      <button type="button" id="btn-nav-categorias" class="nav-btn admin-only">Categorías</button>
+      <button type="button" id="btn-nav-proveedores" class="nav-btn admin-only">Proveedores</button>
+      <button type="button" id="btn-nav-compras" class="nav-btn admin-only">Compras</button>
+      <button type="button" id="btn-nav-descuentos" class="nav-btn admin-only">Descuentos</button>
+      <button type="button" id="btn-nav-reportes" class="nav-btn admin-only">Reportes</button>
+      <button type="button" id="btn-logout" class="nav-btn btn-danger">Salir</button>
     </nav>
   </header>
 
   <main>
-
     <!-- 1. VISTA POS / FACTURACIÓN -->
     <section id="vista-pos" class="pos-container">
-
       <section id="catalogo-productos">
         <div class="catalogo-banner">
           <div class="catalogo-text">
@@ -58,7 +63,6 @@
             <span class="stat-label">Artículos</span>
           </div>
         </div>
-
         <div class="filter-bar">
           <div class="search-box">
             <input type="search" id="search-input" placeholder="Buscar producto por nombre, categoria o codigo..." aria-label="Buscar producto">
@@ -68,7 +72,6 @@
             <button type="button" id="btn-catalogo" class="view-btn">🗂️ Catálogo</button>
           </div>
         </div>
-
         <p id="catalogo-estado" role="status"></p>
         <button type="button" id="btn-reintentar-catalogo" class="hidden">Reintentar carga</button>
         <div id="product-grid" class="product-grid"></div>
@@ -78,23 +81,23 @@
       <section class="invoice-section">
         <div class="invoice-card">
           <div class="invoice-header">
-            <h2>Factura de Venta</h2>
-            <p>Resumen y desglose de compra</p>
+            <h2 id="invoice-header-title">Factura de Venta</h2>
+            <p id="invoice-header-sub">Resumen y desglose de compra</p>
           </div>
-
           <div id="invoice-items-list" class="invoice-items-list"></div>
-
           <div class="invoice-summary">
             <div class="summary-row">
               <span>Subtotal General:</span>
               <strong id="subtotal-valor">$0</strong>
             </div>
-
             <div class="summary-row">
               <span>IVA Aplicado (19%):</span>
               <strong id="iva-valor">$0</strong>
             </div>
-
+            <div class="summary-row">
+              <span>Descuento Aplicado:</span>
+              <strong id="descuento-valor">-$0</strong>
+            </div>
             <hr class="divider">
             <div class="summary-row total-row">
               <span>TOTAL A PAGAR:</span>
@@ -108,14 +111,19 @@
                 <small id="venta-abierta-estado" role="status"></small>
               </div>
               <div class="form-group">
+                <label for="select-descuento">Descuento (máx. 1 por venta):</label>
+                <select id="select-descuento">
+                  <option value="">Sin descuento</option>
+                </select>
+              </div>
+              <div class="form-group">
                 <label for="select-pago">Método de Pago:</label>
-                <select id="select-pago" class ="input-pago">
+                <select id="select-pago" class="input-pago">
                   <option value="Efectivo">Efectivo</option>
                   <option value="Nequi">Nequi</option>
                   <option value="Debe">Debe (Crédito)</option>
                 </select>
               </div>
-
               <div id="grupo-efectivo" class="form-group">
                 <label for="monto-recibido">Monto Recibido ($):</label>
                 <input type="number" id="monto-recibido" placeholder="0" min="0">
@@ -126,11 +134,11 @@
               <button type="button" id="btn-vaciar" class="btn-vaciar">Vaciar Factura</button>
               <button type="button" id="btn-finalizar" class="btn-finalizar">Finalizar Venta</button>
               <button type="button" id="btn-guardar-abierta" class="btn-primary">Guardar venta abierta</button>
+              <button type="button" id="btn-cancelar-correccion" class="btn-cancel hidden">Cancelar corrección</button>
             </div>
           </div>
         </div>
       </section>
-
     </section>
 
     <!-- 2. VISTA GESTIÓN DE PRODUCTOS (CRUD) -->
@@ -142,7 +150,6 @@
         </div>
         <button type="button" id="btn-new-product" class="btn-primary">Nuevo Producto</button>
       </div>
-
       <div class="table-responsive">
         <table class="crud-table">
           <thead>
@@ -168,10 +175,10 @@
       <h3>Ventas abiertas</h3>
       <div id="ventas-abiertas-container" class="historial-list"></div>
       <h3>Ventas cerradas</h3>
-      
       <div id="historial-container" class="historial-list"></div>
     </section>
 
+    <!-- 4. VISTA CLIENTES -->
     <section id="vista-clientes" class="vista-oculta admin-container">
       <div class="crud-header">
         <h2>Clientes</h2>
@@ -186,50 +193,296 @@
         <div><button type="submit" class="btn-primary">Guardar cliente</button> <button type="button" id="btn-cancelar-cliente" class="btn-primary">Nuevo / Cancelar edición</button></div>
       </form>
       <div class="form-group"><label for="buscar-cliente">Buscar cliente:</label><input id="buscar-cliente" type="search" placeholder="Nombre, teléfono o correo"></div>
-      <div class="table-responsive"><table class="crud-table">
-        <thead><tr><th>Nombre</th><th>Teléfono</th><th>Correo</th><th>Acciones</th></tr></thead>
-        <tbody id="clientes-table-body"></tbody>
-      </table></div>
+      <div class="table-responsive">
+        <table class="crud-table">
+          <thead><tr><th>Nombre</th><th>Teléfono</th><th>Correo</th><th>Acciones</th></tr></thead>
+          <tbody id="clientes-table-body"></tbody>
+        </table>
+      </div>
     </section>
-<section id="vista-proveedores" class="vista-oculta admin-container">
- <div class="crud-header"><h2>Proveedores</h2><button type="button" id="proveedores-recargar" class="btn-primary">Recargar</button></div>
- <p id="proveedores-estado" role="status"></p>
- <form id="proveedores-form" class="modal-form"><input type="hidden" id="proveedores-id"><div class="form-group"><label for="proveedores-nombre">Nombre:</label><input id="proveedores-nombre" type="text" required></div><div class="form-group"><label for="proveedores-telefono">Teléfono:</label><input id="proveedores-telefono" type="tel" ></div><div class="form-group"><label for="proveedores-correo">Correo:</label><input id="proveedores-correo" type="email" ></div>
- <div><button type="submit" class="btn-primary">Guardar</button> <button type="button" id="proveedores-cancelar" class="btn-primary">Nuevo / Cancelar edición</button></div></form>
- <div class="form-group"><label for="proveedores-buscar">Buscar:</label><input id="proveedores-buscar" type="search"></div>
- <div class="table-responsive"><table class="crud-table"><thead><tr><th>Referencia</th><th>Nombre</th><th>Teléfono</th><th>Correo</th><th>Acciones</th></tr></thead><tbody id="proveedores-body"></tbody></table></div>
- </section>
-<section id="vista-categorias" class="vista-oculta admin-container">
- <div class="crud-header"><h2>Categorías</h2><button type="button" id="categorias-recargar" class="btn-primary">Recargar</button></div>
- <p id="categorias-estado" role="status"></p>
- <form id="categorias-form" class="modal-form"><input type="hidden" id="categorias-id"><div class="form-group"><label for="categorias-nombre">Nombre:</label><input id="categorias-nombre" type="text" required></div>
- <div><button type="submit" class="btn-primary">Guardar</button> <button type="button" id="categorias-cancelar" class="btn-primary">Nuevo / Cancelar edición</button></div></form>
- <div class="form-group"><label for="categorias-buscar">Buscar:</label><input id="categorias-buscar" type="search"></div>
- <div class="table-responsive"><table class="crud-table"><thead><tr><th>Referencia</th><th>Nombre</th><th>Acciones</th></tr></thead><tbody id="categorias-body"></tbody></table></div>
- </section>
-<section id="vista-compras" class="vista-oculta admin-container">
- <div class="crud-header"><div><h2>Compras</h2><p class="section-help">Registra una compra con todos sus productos y costos.</p></div><button type="button" id="btn-recargar-compras" class="btn-discreto">↻ Recargar</button></div>
- <form id="compra-form" class="modal-form">
- <fieldset class="compra-paso"><legend><span class="paso-numero">1</span> Proveedor</legend>
- <div class="context-field"><div class="form-group"><label for="compra-proveedor">Selecciona el proveedor</label><select id="compra-proveedor" required><option value="">Selecciona un proveedor</option></select></div><button type="button" id="btn-nuevo-proveedor-compra" class="btn-contextual">+ Nuevo proveedor</button></div>
- </fieldset>
- <fieldset class="compra-paso"><legend><span class="paso-numero">2</span> Productos</legend>
- <p class="section-help">Agrega cada producto a la lista. Puedes registrar varios en una sola compra.</p>
- <div class="context-field"><div class="form-group"><label for="compra-producto">Selecciona un producto</label><select id="compra-producto"><option value="">Selecciona un producto</option></select></div><button type="button" id="btn-nuevo-producto-compra" class="btn-contextual">+ Nuevo producto</button></div>
- <div class="form-row"><div class="form-group"><label for="compra-cantidad">Cantidad:</label><input type="number" id="compra-cantidad" min="1" step="1" value="1"></div>
- <div class="form-group"><label for="compra-costo">Costo por unidad:</label><input type="number" id="compra-costo" min="0" step="1"></div></div>
- <button type="button" id="btn-agregar-compra" class="btn-secondary">+ Agregar a la compra</button>
- </fieldset>
- <fieldset class="compra-paso"><legend><span class="paso-numero">3</span> Resumen</legend>
- <div class="table-responsive"><table class="crud-table"><thead><tr><th>Producto</th><th>Cantidad</th><th>Costo</th><th>Subtotal</th><th>Acciones</th></tr></thead><tbody id="compra-items"></tbody></table></div>
- <div class="compra-resumen"><p>Total de la compra</p><strong id="compra-total">$0</strong></div>
- </fieldset>
- <div class="compra-confirmar"><p class="section-help">Revisa los productos, cantidades y costos antes de registrar.</p><button type="submit" id="btn-registrar-compra" class="btn-primary">Registrar compra</button></div>
- </form><p id="compra-estado" role="status"></p>
- <h3>Compras registradas</h3><p id="compras-lista-estado" role="status"></p><div id="compras-lista" class="historial-list"></div>
- </section>
+
+    <!-- 5. VISTA PROVEEDORES -->
+    <section id="vista-proveedores" class="vista-oculta admin-container">
+      <div class="crud-header"><h2>Proveedores</h2><button type="button" id="proveedores-recargar" class="btn-primary">Recargar</button></div>
+      <p id="proveedores-estado" role="status"></p>
+      <form id="proveedores-form" class="modal-form">
+        <input type="hidden" id="proveedores-id">
+        <div class="form-group"><label for="proveedores-nombre">Nombre:</label><input id="proveedores-nombre" type="text" required></div>
+        <div class="form-group"><label for="proveedores-telefono">Teléfono:</label><input id="proveedores-telefono" type="tel"></div>
+        <div class="form-group"><label for="proveedores-correo">Correo:</label><input id="proveedores-correo" type="email"></div>
+        <div><button type="submit" class="btn-primary">Guardar</button> <button type="button" id="proveedores-cancelar" class="btn-primary">Nuevo / Cancelar edición</button></div>
+      </form>
+      <div class="form-group"><label for="proveedores-buscar">Buscar:</label><input id="proveedores-buscar" type="search"></div>
+      <div class="table-responsive"><table class="crud-table"><thead><tr><th>Referencia</th><th>Nombre</th><th>Teléfono</th><th>Correo</th><th>Acciones</th></tr></thead><tbody id="proveedores-body"></tbody></table></div>
+    </section>
+
+    <!-- 6. VISTA CATEGORÍAS -->
+    <section id="vista-categorias" class="vista-oculta admin-container">
+      <div class="crud-header"><h2>Categorías</h2><button type="button" id="categorias-recargar" class="btn-primary">Recargar</button></div>
+      <p id="categorias-estado" role="status"></p>
+      <form id="categorias-form" class="modal-form">
+        <input type="hidden" id="categorias-id">
+        <div class="form-group"><label for="categorias-nombre">Nombre:</label><input id="categorias-nombre" type="text" required></div>
+        <div><button type="submit" class="btn-primary">Guardar</button> <button type="button" id="categorias-cancelar" class="btn-primary">Nuevo / Cancelar edición</button></div>
+      </form>
+      <div class="form-group"><label for="categorias-buscar">Buscar:</label><input id="categorias-buscar" type="search"></div>
+      <div class="table-responsive"><table class="crud-table"><thead><tr><th>Referencia</th><th>Nombre</th><th>Acciones</th></tr></thead><tbody id="categorias-body"></tbody></table></div>
+    </section>
+
+    <!-- 7. VISTA COMPRAS -->
+    <section id="vista-compras" class="vista-oculta admin-container">
+      <div class="crud-header"><div><h2>Compras</h2><p class="section-help">Registra una compra con todos sus productos y costos.</p></div><button type="button" id="btn-recargar-compras" class="btn-discreto">↻ Recargar</button></div>
+      <form id="compra-form" class="modal-form">
+        <fieldset class="compra-paso"><legend><span class="paso-numero">1</span> Proveedor</legend>
+          <div class="context-field"><div class="form-group"><label for="compra-proveedor">Selecciona el proveedor</label><select id="compra-proveedor" required><option value="">Selecciona un proveedor</option></select></div><button type="button" id="btn-nuevo-proveedor-compra" class="btn-contextual">+ Nuevo proveedor</button></div>
+        </fieldset>
+        <fieldset class="compra-paso"><legend><span class="paso-numero">2</span> Productos</legend>
+          <p class="section-help">Agrega cada producto a la lista. Puedes registrar varios en una sola compra.</p>
+          <div class="context-field"><div class="form-group"><label for="compra-producto">Selecciona un producto</label><select id="compra-producto"><option value="">Selecciona un producto</option></select></div><button type="button" id="btn-nuevo-producto-compra" class="btn-contextual">+ Nuevo producto</button></div>
+          <div class="form-row"><div class="form-group"><label for="compra-cantidad">Cantidad:</label><input type="number" id="compra-cantidad" min="1" step="1" value="1"></div>
+          <div class="form-group"><label for="compra-costo">Costo por unidad:</label><input type="number" id="compra-costo" min="0" step="1"></div></div>
+          <button type="button" id="btn-agregar-compra" class="btn-secondary">+ Agregar a la compra</button>
+        </fieldset>
+        <fieldset class="compra-paso"><legend><span class="paso-numero">3</span> Resumen</legend>
+          <div class="table-responsive"><table class="crud-table"><thead><tr><th>Producto</th><th>Cantidad</th><th>Costo</th><th>Subtotal</th><th>Acciones</th></tr></thead><tbody id="compra-items"></tbody></table></div>
+          <div class="compra-resumen"><p>Total de la compra</p><strong id="compra-total">$0</strong></div>
+        </fieldset>
+        <div class="compra-confirmar"><p class="section-help">Revisa los productos, cantidades y costos antes de registrar.</p><button type="submit" id="btn-registrar-compra" class="btn-primary">Registrar compra</button></div>
+      </form>
+      <p id="compra-estado" role="status"></p>
+      <h3>Compras registradas</h3><p id="compras-lista-estado" role="status"></p><div id="compras-lista" class="historial-list"></div>
+    </section>
+
+    <!-- 8. VISTA DESCUENTOS (NUEVO MVP 3) -->
+    <section id="vista-descuentos" class="vista-oculta admin-container">
+      <div class="crud-header">
+        <div>
+          <h2>Catálogo de Descuentos</h2>
+          <p>Crea descuentos porcentuales o de valor fijo reutilizables en las ventas.</p>
+        </div>
+        <button type="button" id="descuentos-recargar" class="btn-primary">Recargar</button>
+      </div>
+      <p id="descuentos-estado" role="status"></p>
+      <form id="descuentos-form" class="modal-form">
+        <input type="hidden" id="descuentos-id">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="descuentos-nombre">Nombre del descuento:</label>
+            <input id="descuentos-nombre" type="text" placeholder="Ej: Estudiante 10%" required>
+          </div>
+          <div class="form-group">
+            <label for="descuentos-tipo">Tipo:</label>
+            <select id="descuentos-tipo" required>
+              <option value="porcentaje">Porcentaje (%)</option>
+              <option value="fijo">Valor fijo ($)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="descuentos-valor">Valor:</label>
+            <input id="descuentos-valor" type="number" min="1" step="1" required>
+          </div>
+        </div>
+        <div>
+          <button type="submit" class="btn-primary">Guardar descuento</button>
+          <button type="button" id="descuentos-cancelar" class="btn-primary">Nuevo / Cancelar edición</button>
+        </div>
+      </form>
+      <div class="table-responsive">
+        <table class="crud-table">
+          <thead><tr><th>Nombre</th><th>Tipo</th><th>Valor</th><th>Acciones</th></tr></thead>
+          <tbody id="descuentos-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 9. VISTA FALTANTES (NUEVO MVP 3) -->
+    <section id="vista-faltantes" class="vista-oculta admin-container">
+      <div class="crud-header">
+        <div>
+          <h2>Registro de Faltantes</h2>
+          <p>Registra productos agotados o inexistentes solicitados por los clientes.</p>
+        </div>
+        <button type="button" id="btn-recargar-faltantes" class="btn-primary">Recargar faltantes</button>
+      </div>
+      <form id="faltante-form" class="modal-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="faltante-tipo">Tipo de faltante:</label>
+            <select id="faltante-tipo" required>
+              <option value="agotado">Producto existente agotado</option>
+              <option value="inexistente">Producto inexistente (solicitud escrita)</option>
+            </select>
+          </div>
+          <div class="form-group" id="grupo-faltante-producto">
+            <label for="faltante-producto">Producto del catálogo:</label>
+            <select id="faltante-producto"><option value="">Selecciona un producto...</option></select>
+          </div>
+          <div class="form-group" id="grupo-faltante-descripcion">
+            <label for="faltante-descripcion">Descripción escrita:</label>
+            <input type="text" id="faltante-descripcion" placeholder="Ej: Lápices rojos">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="faltante-cantidad">Cantidad solicitada:</label>
+            <input type="number" id="faltante-cantidad" min="1" value="1" required>
+          </div>
+          <div class="form-group">
+            <label for="faltante-proveedor">Proveedor sugerido (opcional):</label>
+            <select id="faltante-proveedor"><option value="">Sin proveedor</option></select>
+          </div>
+        </div>
+        <button type="submit" class="btn-primary">Registrar faltante</button>
+      </form>
+
+      <div class="form-row" style="margin-top: 1.5rem;">
+        <div class="form-group">
+          <label for="filtro-faltante-tipo">Filtrar por tipo:</label>
+          <select id="filtro-faltante-tipo">
+            <option value="">Todos</option>
+            <option value="agotado">Agotado</option>
+            <option value="inexistente">Inexistente</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="filtro-faltante-proveedor">Filtrar por proveedor:</label>
+          <select id="filtro-faltante-proveedor"><option value="">Todos los proveedores</option></select>
+        </div>
+      </div>
+
+      <h3>Resumen agrupado de pendientes (para futuras compras)</h3>
+      <div class="table-responsive">
+        <table class="crud-table">
+          <thead><tr><th>Producto / Nombre Normalizado</th><th>Tipo</th><th>Proveedor</th><th>Solicitudes</th><th>Cantidad Total</th></tr></thead>
+          <tbody id="faltantes-agrupados-body"></tbody>
+        </table>
+      </div>
+
+      <h3 style="margin-top: 1.5rem;">Listado detallado de faltantes</h3>
+      <div class="table-responsive">
+        <table class="crud-table">
+          <thead><tr><th>Fecha</th><th>Producto / Descripción</th><th>Tipo</th><th>Cantidad</th><th>Proveedor</th><th>Estado</th><th>Acción</th></tr></thead>
+          <tbody id="faltantes-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 10. VISTA REPORTES (NUEVO MVP 3) -->
+    <section id="vista-reportes" class="vista-oculta admin-container">
+      <div class="crud-header">
+        <div>
+          <h2>Reportes Administrativos</h2>
+          <p>Consulta ventas, productos más vendidos, compras y faltantes frecuentes por rango de fechas (mínimo 1 día).</p>
+        </div>
+      </div>
+      <form id="reportes-form" class="modal-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="reporte-fecha-inicio">Fecha inicio:</label>
+            <input type="date" id="reporte-fecha-inicio" required>
+          </div>
+          <div class="form-group">
+            <label for="reporte-fecha-fin">Fecha fin:</label>
+            <input type="date" id="reporte-fecha-fin" required>
+          </div>
+          <div class="form-group" style="align-self: flex-end;">
+            <button type="submit" class="btn-primary">Consultar reporte</button>
+          </div>
+        </div>
+      </form>
+      <div id="reportes-resumen-cards" class="historial-list" style="margin-top: 1rem;"></div>
+
+      <h3 style="margin-top: 1.5rem;">Productos más vendidos en el rango</h3>
+      <div class="table-responsive">
+        <table class="crud-table">
+          <thead><tr><th>Producto</th><th>Unidades Vendidas</th><th>Subtotal Generado</th></tr></thead>
+          <tbody id="reporte-mas-vendidos-body"></tbody>
+        </table>
+      </div>
+
+      <h3 style="margin-top: 1.5rem;">Compras registradas en el rango</h3>
+      <div class="table-responsive">
+        <table class="crud-table">
+          <thead><tr><th>Referencia</th><th>Fecha</th><th>Proveedor</th><th>Total Compra</th></tr></thead>
+          <tbody id="reporte-compras-body"></tbody>
+        </table>
+      </div>
+
+      <h3 style="margin-top: 1.5rem;">Faltantes frecuentes</h3>
+      <div class="table-responsive">
+        <table class="crud-table">
+          <thead><tr><th>Nombre Normalizado</th><th>Tipo</th><th>Veces Solicitado</th><th>Unidades Totales</th></tr></thead>
+          <tbody id="reporte-faltantes-body"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
 
+  <!-- MODAL DE LOGIN (MVP 3) -->
+  <div id="login-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
+    <div class="modal-card modal-compacta">
+      <div class="modal-header">
+        <h3 id="login-modal-title">Iniciar Sesión — Papel y Luna</h3>
+      </div>
+      <form id="login-form" class="modal-form">
+        <div class="form-group">
+          <label for="login-username">Usuario:</label>
+          <input type="text" id="login-username" required autocomplete="username" placeholder="admin o cajero">
+        </div>
+        <div class="form-group">
+          <label for="login-password">Contraseña:</label>
+          <input type="password" id="login-password" required autocomplete="current-password">
+        </div>
+        <p id="login-error" role="alert" style="color: #dc2626; font-size: 0.9rem;"></p>
+        <div class="modal-actions">
+          <button type="submit" id="btn-login-submit" class="btn-primary">Ingresar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DE REEMBOLSO (MVP 3 - SOLO ADMIN) -->
+  <div id="reembolso-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="reembolso-modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="reembolso-modal-title">Registrar Reembolso</h3>
+        <button type="button" id="btn-cerrar-reembolso" class="close-modal-btn">✕</button>
+      </div>
+      <form id="reembolso-form" class="modal-form">
+        <input type="hidden" id="reembolso-venta-id">
+        <p id="reembolso-venta-info"></p>
+        <div class="table-responsive">
+          <table class="crud-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Vendidos (Disp.)</th>
+                <th>Precio Unit.</th>
+                <th>Cant. a Reembolsar</th>
+              </tr>
+            </thead>
+            <tbody id="reembolso-items-body"></tbody>
+          </table>
+        </div>
+        <div class="form-row checkbox-row" style="margin-top: 1rem;">
+          <label class="checkbox-label">
+            <input type="checkbox" id="reembolso-retorna-stock" checked>
+            Devolver unidades reembolsadas al inventario (Stock)
+          </label>
+        </div>
+        <div class="compra-resumen">
+          <p>Valor estimado a reembolsar (respeta descuento proporcional):</p>
+          <strong id="reembolso-total-estimado">$0</strong>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="btn-cancelar-reembolso" class="btn-cancel">Cancelar</button>
+          <button type="submit" id="btn-confirmar-reembolso" class="btn-primary">Confirmar Reembolso</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL NUEVO PROVEEDOR CONTEXTUAL -->
   <div id="nuevo-proveedor-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="nuevo-proveedor-titulo">
     <div class="modal-card modal-compacta">
       <div class="modal-header"><h3 id="nuevo-proveedor-titulo">Nuevo proveedor</h3><button type="button" id="btn-cerrar-nuevo-proveedor" class="close-modal-btn" aria-label="Cerrar">✕</button></div>
@@ -250,10 +503,8 @@
         <h3 id="modal-title">Nuevo Producto</h3>
         <button type="button" id="btn-close-product-modal" class="close-modal-btn">✕</button>
       </div>
-
       <form id="product-form" class="modal-form">
         <input type="hidden" id="product-id">
-
         <div class="form-row">
           <div class="form-group">
             <label for="product-code">Código:</label>
@@ -264,17 +515,14 @@
             <select id="product-category" required><option value="">Selecciona una categoría</option></select>
           </div>
         </div>
-
         <div class="form-group">
           <label for="product-name">Nombre del Producto:</label>
           <input type="text" id="product-name" placeholder="Ej: Bolígrafo Azul 0.7mm" required>
         </div>
-
         <div class="form-group">
           <label for="product-description">Descripción (opcional):</label>
           <textarea id="product-description" rows="2" placeholder="Detalles o especificaciones"></textarea>
         </div>
-
         <div class="form-row">
           <div class="form-group">
             <label for="product-price">Precio de Venta ($):</label>
@@ -285,19 +533,16 @@
             <input type="number" id="product-cost" min="0" step="50" required>
           </div>
         </div>
-
         <div class="form-row checkbox-row">
           <label class="checkbox-label">
             <input type="checkbox" id="track-inventory">
             ¿Controlar inventario / Stock?
           </label>
         </div>
-
         <div class="form-group">
           <label for="product-stock">Cantidad en Stock:</label>
           <input type="number" id="product-stock" min="0" disabled placeholder="Solo si controla stock">
         </div>
-
         <div class="modal-actions">
           <button type="button" id="btn-cancel-product-modal" class="btn-cancel">Cancelar</button>
           <button type="submit" class="btn-primary">Guardar Producto</button>
@@ -323,10 +568,8 @@
       </div>
     </div>
   </div>
-  
+
   <!-- NOTIFICACIONES -->
   <div id="notificacion" class="notificacion hidden" role="status" aria-live="polite"></div>
-
 </body>
 </html>
-

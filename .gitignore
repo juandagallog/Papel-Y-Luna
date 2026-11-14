@@ -1,0 +1,27 @@
+# Variables de entorno y secretos (NUNCA subir a GitHub)
+.env
+.env.*
+!.env.example
+
+# Entornos virtuales de Python
+venv/
+.venv/
+ENV/
+env/
+
+# Caché de Python y archivos compilados
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Base de datos local SQLite y estáticos generados
+backend/db.sqlite3
+backend/db.sqlite3-journal
+backend/staticfiles/
+db.sqlite3
+
+# Archivos temporales del sistema y del editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

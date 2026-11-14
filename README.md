@@ -125,4 +125,47 @@ La URL del frontend abre la aplicación; es distinta de `API_URL`, que recibe la
 - Incluir `index.html`, `README.md`, `AppsScript.gs`, `js/`, `css/` e `imagenes/` en el ZIP; excluir `.git/`.
 - Verificar que `AppsScript.gs` corresponda a la versión publicada del servicio y completar los nombres de los integrantes antes de entregar.
 
+
 El alcance de esta entrega se toma del documento MVP 2. Descuentos, reembolsos, correcciones de ventas cerradas, reportes, autenticación, roles y backend propio quedan para MVP 3.
+# 🌙 Papel y Luna — Sistema POS Full-Stack (MVP 3)
+
+Sistema de Punto de Venta (POS) y gestión administrativa para la papelería **Papel y Luna**, desarrollado en tres iteraciones incrementales (MVP 1 → MVP 2 → MVP 3).
+
+En esta entrega final (**MVP 3**), el sistema evoluciona desde Google Apps Script / Google Sheets hacia una arquitectura **Full-Stack con Backend propio en Django, API REST y Base de Datos Relacional (SQLite en desarrollo / PostgreSQL en Render)**.
+
+---
+
+## 1. Arquitectura del Sistema
+
+```text
+papel-y-luna/
+├── index.html                  # Interfaz SPA en HTML5
+├── css/Style.css               # Estilos responsive
+├── imagenes/                   # Catálogo visual de productos
+├── js/                         # Módulos Frontend (JavaScript Vanilla)
+│   ├── api.js                  # Cliente HTTP REST + Sesiones
+│   ├── app.js                  # Autenticación, Roles, Descuentos, Faltantes y Reportes
+│   ├── pos.js                  # Flujo de caja, descuentos en vivo y modo corrección
+│   ├── productos.js            # CRUD de productos e inventario
+│   ├── clientes.js             # CRUD de clientes
+│   ├── compras.js              # Registro de compras y aumento transaccional de stock
+│   ├── gestion.js              # CRUD de categorías y proveedores
+│   ├── historial.js            # Historial, reimpresión, correcciones y reembolsos
+│   ├── ventas-abiertas.js      # Guardado y recuperación de ventas abiertas
+│   ├── borrador-venta.js       # Recuperación de borrador local ante recargas
+│   └── loading.js              # Indicadores de carga y skeletons
+├── backend/                    # Backend Django + Django REST Framework
+│   ├── manage.py
+│   ├── seed_users.py           # Precarga de usuarios Administrador y Cajero
+│   ├── config/                 # Configuración global, CORS, BD y rutas raíz
+│   └── tienda/                 # Aplicación principal del negocio
+│       ├── models.py           # 12 modelos relacionales con integridad PROTECT
+│       ├── serializers.py      # Validación y transformación JSON
+│       ├── services.py         # Lógica de negocio y transacciones atómicas
+│       ├── permissions.py      # Autorización en servidor por rol (ADMIN / CAJERO)
+│       ├── views.py            # Controladores REST
+│       ├── urls.py             # Endpoints bajo /api/
+│       └── tests.py            # Pruebas integrales automatizadas
+├── requirements.txt
+├── .env.example
+└── .gitignore

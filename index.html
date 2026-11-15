@@ -4,9 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Papelería Papel y Luna - Sistema POS</title>
+  <script src="js/tema.js"></script>
   <link rel="stylesheet" href="css/Style.css">
   <script src="js/api.js" defer></script>
   <script src="js/loading.js" defer></script>
+  <script src="js/ui.js" defer></script>
   <script src="js/borrador-venta.js" defer></script>
   <script src="js/productos.js" defer></script>
   <script src="js/clientes.js" defer></script>
@@ -17,7 +19,8 @@
   <script src="js/compras.js" defer></script>
   <script src="js/app.js" defer></script>
 </head>
-<body>
+<body data-sesion="pendiente">
+  <div id="session-loading" class="session-loading" role="status" aria-live="polite"><span class="loading-spinner" aria-hidden="true"></span><span>Comprobando sesión…</span></div>
   <div id="loading-global" class="loading-global hidden" role="status" aria-live="polite" aria-busy="false">
     <div class="loading-panel">
       <span class="loading-spinner" aria-hidden="true"></span>
@@ -27,16 +30,18 @@
 
   <header class="main-header">
     <div class="header-brand">
-      <span class="brand-logo">🌙</span>
+      <span class="brand-logo" aria-hidden="true">☾</span>
       <div>
         <h1 class="brand-title">Papel y Luna</h1>
         <p class="brand-sub">Sistema de Facturación POS — <span id="session-user-badge">Sin sesión</span></p>
       </div>
     </div>
-    <nav class="header-nav">
+    <label class="theme-control"><span aria-hidden="true">◐</span><span class="sr-only">Tema de color</span><select data-selector-tema><option value="ciruela">Ciruela</option><option value="terracota">Terracota</option><option value="tinta">Azul tinta</option></select></label>
+    <nav class="header-nav" aria-label="Secciones principales">
       <button type="button" id="btn-nav-pos" class="nav-btn active">POS / Factura</button>
       <button type="button" id="btn-nav-historial" class="nav-btn">Historial</button>
       <button type="button" id="btn-nav-clientes" class="nav-btn">Clientes</button>
+      <details class="nav-more" open><summary>Más secciones</summary><div class="nav-more-items">
       <button type="button" id="btn-nav-faltantes" class="nav-btn">Faltantes</button>
       <!-- Vistas exclusivas de Administrador -->
       <button type="button" id="btn-nav-productos" class="nav-btn admin-only">Productos</button>
@@ -46,6 +51,7 @@
       <button type="button" id="btn-nav-descuentos" class="nav-btn admin-only">Descuentos</button>
       <button type="button" id="btn-nav-reportes" class="nav-btn admin-only">Reportes</button>
       <button type="button" id="btn-logout" class="nav-btn btn-danger">Salir</button>
+      </div></details>
     </nav>
   </header>
 
@@ -62,6 +68,7 @@
             <span class="stat-number" id="total-products-count">0</span>
             <span class="stat-label">Artículos</span>
           </div>
+          <button type="button" id="btn-nuevo-producto-pos" class="btn-contextual admin-only">+ Nuevo producto</button>
         </div>
         <div class="filter-bar">
           <div class="search-box">
@@ -78,7 +85,7 @@
       </section>
 
       <!-- SECCIÓN FACTURA -->
-      <section class="invoice-section">
+      <section class="invoice-section" id="panel-venta" tabindex="-1" aria-label="Venta actual">
         <div class="invoice-card">
           <div class="invoice-header">
             <h2 id="invoice-header-title">Factura de Venta</h2>
@@ -106,15 +113,16 @@
             <div class="payment-section">
               <div class="form-group">
                 <label for="select-cliente">Cliente:</label>
-                <select id="select-cliente"><option value="">Sin cliente</option></select>
+                <div class="context-field"><select id="select-cliente"><option value="">Sin cliente</option></select><button type="button" id="btn-nuevo-cliente-pos" class="btn-contextual">+ Nuevo</button></div>
                 <small id="clientes-pos-estado" role="status"></small>
                 <small id="venta-abierta-estado" role="status"></small>
               </div>
               <div class="form-group">
-                <label for="select-descuento">Descuento (máx. 1 por venta):</label>
+                <label for="select-descuento">Descuento</label>
                 <select id="select-descuento">
                   <option value="">Sin descuento</option>
                 </select>
+                <button type="button" id="btn-descuento-puntual" class="btn-discreto admin-only">Descuento solo para esta factura</button>
               </div>
               <div class="form-group">
                 <label for="select-pago">Método de Pago:</label>
@@ -133,12 +141,13 @@
             <div class="invoice-actions">
               <button type="button" id="btn-vaciar" class="btn-vaciar">Vaciar Factura</button>
               <button type="button" id="btn-finalizar" class="btn-finalizar">Finalizar Venta</button>
-              <button type="button" id="btn-guardar-abierta" class="btn-primary">Guardar venta abierta</button>
+              <button type="button" id="btn-guardar-abierta" class="btn-secondary">Guardar venta abierta</button>
               <button type="button" id="btn-cancelar-correccion" class="btn-cancel hidden">Cancelar corrección</button>
             </div>
           </div>
         </div>
       </section>
+      <button type="button" id="acceso-venta-movil" class="acceso-venta-movil">Ver venta <strong id="total-venta-movil">$0</strong><span aria-hidden="true">↓</span></button>
     </section>
 
     <!-- 2. VISTA GESTIÓN DE PRODUCTOS (CRUD) -->
@@ -182,7 +191,7 @@
     <section id="vista-clientes" class="vista-oculta admin-container">
       <div class="crud-header">
         <h2>Clientes</h2>
-        <button type="button" id="btn-recargar-clientes" class="btn-primary">Recargar clientes</button>
+        <div class="acciones-seccion"><button type="button" id="btn-recargar-clientes" class="btn-discreto">↻ Recargar</button><button type="button" id="btn-nuevo-cliente" class="btn-primary">+ Nuevo cliente</button></div>
       </div>
       <p id="clientes-estado" role="status"></p>
       <form id="cliente-form" class="modal-form">
@@ -203,7 +212,7 @@
 
     <!-- 5. VISTA PROVEEDORES -->
     <section id="vista-proveedores" class="vista-oculta admin-container">
-      <div class="crud-header"><h2>Proveedores</h2><button type="button" id="proveedores-recargar" class="btn-primary">Recargar</button></div>
+      <div class="crud-header"><h2>Proveedores</h2><div class="acciones-seccion"><button type="button" id="proveedores-recargar" class="btn-discreto">↻ Recargar</button><button type="button" id="btn-nuevo-proveedor" class="btn-primary">+ Nuevo proveedor</button></div></div>
       <p id="proveedores-estado" role="status"></p>
       <form id="proveedores-form" class="modal-form">
         <input type="hidden" id="proveedores-id">
@@ -250,7 +259,7 @@
         <div class="compra-confirmar"><p class="section-help">Revisa los productos, cantidades y costos antes de registrar.</p><button type="submit" id="btn-registrar-compra" class="btn-primary">Registrar compra</button></div>
       </form>
       <p id="compra-estado" role="status"></p>
-      <h3>Compras registradas</h3><p id="compras-lista-estado" role="status"></p><div id="compras-lista" class="historial-list"></div>
+      <details class="compras-historial" open><summary>Compras registradas</summary><p id="compras-lista-estado" role="status"></p><div id="compras-lista" class="historial-list"></div></details>
     </section>
 
     <!-- 8. VISTA DESCUENTOS (NUEVO MVP 3) -->
@@ -299,18 +308,19 @@
     <section id="vista-faltantes" class="vista-oculta admin-container">
       <div class="crud-header">
         <div>
-          <h2>Registro de Faltantes</h2>
-          <p>Registra productos agotados o inexistentes solicitados por los clientes.</p>
+          <h2>Faltantes</h2>
+          <p class="section-help">Registra la demanda que no pudiste atender.</p>
         </div>
-        <button type="button" id="btn-recargar-faltantes" class="btn-primary">Recargar faltantes</button>
+        <button type="button" id="btn-recargar-faltantes" class="btn-discreto">↻ Recargar</button>
       </div>
+      <div class="faltantes-layout"><section class="panel-faltante"><h3>Nueva solicitud</h3>
       <form id="faltante-form" class="modal-form">
         <div class="form-row">
           <div class="form-group">
             <label for="faltante-tipo">Tipo de faltante:</label>
             <select id="faltante-tipo" required>
-              <option value="agotado">Producto existente agotado</option>
-              <option value="inexistente">Producto inexistente (solicitud escrita)</option>
+              <option value="agotado">Agotado en catálogo</option>
+              <option value="inexistente">No está en catálogo</option>
             </select>
           </div>
           <div class="form-group" id="grupo-faltante-producto">
@@ -334,8 +344,9 @@
         </div>
         <button type="submit" class="btn-primary">Registrar faltante</button>
       </form>
-
-      <div class="form-row" style="margin-top: 1.5rem;">
+      <details class="ayuda-contextual"><summary>¿Cómo se usa?</summary><p>Registra lo que pidió el cliente. El resumen agrupa pendientes por producto y proveedor para orientar próximas compras. Marca la solicitud resuelta cuando la atiendas.</p></details>
+      </section><section class="panel-faltante resultados-faltantes">
+      <div class="form-row filtros-faltantes">
         <div class="form-group">
           <label for="filtro-faltante-tipo">Filtrar por tipo:</label>
           <select id="filtro-faltante-tipo">
@@ -350,21 +361,22 @@
         </div>
       </div>
 
-      <h3>Resumen agrupado de pendientes (para futuras compras)</h3>
+      <h3>Pendientes para comprar</h3>
       <div class="table-responsive">
         <table class="crud-table">
-          <thead><tr><th>Producto / Nombre Normalizado</th><th>Tipo</th><th>Proveedor</th><th>Solicitudes</th><th>Cantidad Total</th></tr></thead>
+          <thead><tr><th>Producto solicitado</th><th>Tipo</th><th>Proveedor</th><th>Solicitudes</th><th>Cantidad total</th></tr></thead>
           <tbody id="faltantes-agrupados-body"></tbody>
         </table>
       </div>
 
-      <h3 style="margin-top: 1.5rem;">Listado detallado de faltantes</h3>
+      <details class="detalle-solicitudes"><summary>Ver todas las solicitudes y resolver</summary>
       <div class="table-responsive">
         <table class="crud-table">
           <thead><tr><th>Fecha</th><th>Producto / Descripción</th><th>Tipo</th><th>Cantidad</th><th>Proveedor</th><th>Estado</th><th>Acción</th></tr></thead>
           <tbody id="faltantes-table-body"></tbody>
         </table>
       </div>
+      </details></section></div>
     </section>
 
     <!-- 10. VISTA REPORTES (NUEVO MVP 3) -->
@@ -385,14 +397,14 @@
             <label for="reporte-fecha-fin">Fecha fin:</label>
             <input type="date" id="reporte-fecha-fin" required>
           </div>
-          <div class="form-group" style="align-self: flex-end;">
+          <div class="form-group filtro-accion">
             <button type="submit" class="btn-primary">Consultar reporte</button>
           </div>
         </div>
       </form>
-      <div id="reportes-resumen-cards" class="historial-list" style="margin-top: 1rem;"></div>
+      <div id="reportes-resumen-cards" class="historial-list reporte-indicadores"></div>
 
-      <h3 style="margin-top: 1.5rem;">Productos más vendidos en el rango</h3>
+      <h3 class="reporte-titulo">Productos más vendidos en el rango</h3>
       <div class="table-responsive">
         <table class="crud-table">
           <thead><tr><th>Producto</th><th>Unidades Vendidas</th><th>Subtotal Generado</th></tr></thead>
@@ -400,7 +412,7 @@
         </table>
       </div>
 
-      <h3 style="margin-top: 1.5rem;">Compras registradas en el rango</h3>
+      <h3 class="reporte-titulo">Compras registradas en el rango</h3>
       <div class="table-responsive">
         <table class="crud-table">
           <thead><tr><th>Referencia</th><th>Fecha</th><th>Proveedor</th><th>Total Compra</th></tr></thead>
@@ -408,7 +420,7 @@
         </table>
       </div>
 
-      <h3 style="margin-top: 1.5rem;">Faltantes frecuentes</h3>
+      <h3 class="reporte-titulo">Faltantes frecuentes</h3>
       <div class="table-responsive">
         <table class="crud-table">
           <thead><tr><th>Nombre Normalizado</th><th>Tipo</th><th>Veces Solicitado</th><th>Unidades Totales</th></tr></thead>
@@ -420,24 +432,28 @@
 
   <!-- MODAL DE LOGIN (MVP 3) -->
   <div id="login-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
-    <div class="modal-card modal-compacta">
+    <div class="modal-card login-layout">
+      <aside class="login-story"><span class="login-moon" aria-hidden="true">☾</span><p class="login-brand">papel y luna</p><h2>Un buen día empieza en orden.</h2><p>Tu papelería, a tu ritmo.</p></aside>
+      <div class="login-content">
+      <label class="theme-control"><span aria-hidden="true">◐</span><span class="sr-only">Tema de color</span><select data-selector-tema><option value="ciruela">Ciruela</option><option value="terracota">Terracota</option><option value="tinta">Azul tinta</option></select></label>
       <div class="modal-header">
-        <h3 id="login-modal-title">Iniciar Sesión — Papel y Luna</h3>
+        <h3 id="login-modal-title">Bienvenido de nuevo</h3>
       </div>
       <form id="login-form" class="modal-form">
         <div class="form-group">
           <label for="login-username">Usuario:</label>
-          <input type="text" id="login-username" required autocomplete="username" placeholder="admin o cajero">
+          <input type="text" id="login-username" required autocomplete="username" placeholder="Tu usuario">
         </div>
         <div class="form-group">
           <label for="login-password">Contraseña:</label>
-          <input type="password" id="login-password" required autocomplete="current-password">
+          <input type="password" id="login-password" required autocomplete="current-password" aria-describedby="login-error">
         </div>
-        <p id="login-error" role="alert" style="color: #dc2626; font-size: 0.9rem;"></p>
+        <p id="login-error" role="alert" class="form-error"></p>
         <div class="modal-actions">
           <button type="submit" id="btn-login-submit" class="btn-primary">Ingresar</button>
         </div>
       </form>
+      </div>
     </div>
   </div>
 
@@ -464,7 +480,7 @@
             <tbody id="reembolso-items-body"></tbody>
           </table>
         </div>
-        <div class="form-row checkbox-row" style="margin-top: 1rem;">
+        <div class="form-row checkbox-row separacion-superior">
           <label class="checkbox-label">
             <input type="checkbox" id="reembolso-retorna-stock" checked>
             Devolver unidades reembolsadas al inventario (Stock)
@@ -526,11 +542,11 @@
         <div class="form-row">
           <div class="form-group">
             <label for="product-price">Precio de Venta ($):</label>
-            <input type="number" id="product-price" min="0" step="50" required>
+            <input type="number" id="product-price" min="0" step="1" required>
           </div>
           <div class="form-group">
             <label for="product-cost">Costo ($):</label>
-            <input type="number" id="product-cost" min="0" step="50" required>
+            <input type="number" id="product-cost" min="0" step="1" required>
           </div>
         </div>
         <div class="form-row checkbox-row">
@@ -571,5 +587,22 @@
 
   <!-- NOTIFICACIONES -->
   <div id="notificacion" class="notificacion hidden" role="status" aria-live="polite"></div>
+  <div id="puntual-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="puntual-titulo">
+    <div class="modal-card modal-compacta">
+      <div class="modal-header"><h3 id="puntual-titulo">Descuento de esta factura</h3><button type="button" id="btn-cerrar-puntual" class="close-modal-btn" aria-label="Cerrar">×</button></div>
+      <p class="section-help">Reemplaza el descuento seleccionado. No se guarda en el catálogo.</p>
+      <form id="puntual-form" class="modal-form">
+        <div class="form-group"><label for="puntual-tipo">Tipo</label><select id="puntual-tipo"><option value="fijo">Valor fijo ($)</option><option value="porcentaje">Porcentaje (%)</option></select></div>
+        <div class="form-group"><label for="puntual-valor">Valor</label><input id="puntual-valor" type="number" min="1" step="1" required></div>
+        <div class="modal-actions"><button type="button" id="btn-cancelar-puntual" class="btn-cancel">Cancelar</button><button type="submit" class="btn-primary">Aplicar descuento</button></div>
+      </form>
+    </div>
+  </div>
+  <div id="confirmacion-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="confirmacion-titulo" aria-describedby="confirmacion-mensaje">
+    <div class="modal-card modal-compacta">
+      <h3 id="confirmacion-titulo">Confirmar acción</h3><p id="confirmacion-mensaje"></p>
+      <div class="modal-actions"><button type="button" id="confirmacion-cancelar" class="btn-cancel" data-foco-inicial>Cancelar</button><button type="button" id="confirmacion-aceptar" class="btn-primary">Confirmar</button></div>
+    </div>
+  </div>
 </body>
 </html>

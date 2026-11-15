@@ -19,9 +19,9 @@ function pintarCarga() {
 }
 // Mantener intacto api.js: envolver sus funciones sin alterar contrato ni reintentos.
 const apiGetSinIndicador = apiGet;
-apiGet = async function(resource) {
+apiGet = async function(resource, ...argumentos) {
   const token = iniciarCarga(null);
-  try { return await apiGetSinIndicador(resource); }
+  try { return await apiGetSinIndicador(resource, ...argumentos); }
   finally { finalizarCarga(token); }
 };
 const apiPostSinIndicador = apiPost;
@@ -61,8 +61,9 @@ function mostrarSkeleton(contenedor, tipo = 'filas', columnas = 1) {
   }
   for (let i = 0; i < 3; i++) {
     const fila = document.createElement('span');
-    const tarjeta = tipo === 'tarjetas' || tipo === 'catalogo';
+    const tarjeta = tipo === 'tarjetas' || tipo === 'catalogo' || tipo === 'resumen-ventas';
     fila.className = tarjeta ? 'historial-card skeleton-card' : tipo === 'catalogo-lista' ? 'skeleton-producto-lista' : 'skeleton-table-row';
+    if (tipo === 'resumen-ventas') fila.classList.add('skeleton-resumen');
     for (let j = 0; j < (tipo === 'tabla' ? columnas : tarjeta || tipo === 'catalogo-lista' ? 3 : 1); j++) {
       const linea = document.createElement('span');
       linea.className = 'skeleton-row';

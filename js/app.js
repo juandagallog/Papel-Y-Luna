@@ -1,12 +1,14 @@
 window.usuarioActual = null;
 
 function mostrarModalLogin() {
+  document.body.dataset.sesion = 'no';
   const modal = document.getElementById("login-modal");
-  if (modal) modal.classList.remove("hidden");
+  if (modal) abrirModalConFoco(modal, document.getElementById('login-username'));
 }
 window.mostrarModalLogin = mostrarModalLogin;
 
 function ocultarModalLogin() {
+  document.body.dataset.sesion = 'si';
   const modal = document.getElementById("login-modal");
   if (modal) modal.classList.add("hidden");
 }
@@ -40,6 +42,7 @@ async function inicializarDatosSistema() {
 // GESTIÓN DE DESCUENTOS (Requisito 3.6 - Solo Admin)
 // =====================================================================
 async function cargarVistaDescuentos() {
+  const quitar = mostrarSkeleton(document.getElementById('descuentos-body'), 'tabla', 4);
   try {
     const lista = await apiGet("descuentos");
     descuentosCatalogo = Array.isArray(lista)
@@ -54,7 +57,7 @@ async function cargarVistaDescuentos() {
     renderTablaDescuentos();
   } catch (error) {
     mostrarNotificacion(error.message, "error");
-  }
+  } finally { quitar(); }
 }
 
 function renderTablaDescuentos() {
@@ -68,12 +71,12 @@ function renderTablaDescuentos() {
         ? `${d.valor}%`
         : `$${Number(d.valor).toLocaleString("es-CO")}`;
     tr.innerHTML = `
-      <td>${d.nombre}</td>
+      <td>${escaparHTML(d.nombre)}</td>
       <td>${d.tipo === "porcentaje" ? "Porcentaje" : "Valor fijo"}</td>
       <td>${valorTexto}</td>
       <td>
-        <button type="button" class="btn-editar" data-id="${d.id}">Editar</button>
-        <button type="button" class="btn-eliminar" data-id="${d.id}">Eliminar</button>
+        <button type="button" class="btn-editar" data-id="${escaparHTML(d.id)}">Editar</button>
+        <button type="button" class="btn-eliminar" data-id="${escaparHTML(d.id)}">Eliminar</button>
       </td>
     `;
     tr.querySelector(".btn-editar").addEventListener("click", () => {
@@ -83,7 +86,7 @@ function renderTablaDescuentos() {
       document.getElementById("descuentos-valor").value = d.valor;
     });
     tr.querySelector(".btn-eliminar").addEventListener("click", async () => {
-      if (!window.confirm(`¿Eliminar el descuento "${d.nombre}"?`)) return;
+      if (!await confirmarAccion(`¿Eliminar el descuento "${d.nombre}"?`, { titulo: 'Eliminar descuento', aceptar: 'Eliminar', peligrosa: true })) return;
       try {
         await apiPost("descuentos", "delete", { id: d.id });
         await cargarVistaDescuentos();
@@ -99,6 +102,8 @@ function renderTablaDescuentos() {
 
 async function guardarDescuento(event) {
   event.preventDefault();
+  const form = document.getElementById('descuentos-form');
+  if (form.getAttribute('aria-busy') === 'true') return;
   const id = document.getElementById("descuentos-id").value.trim();
   const nombre = document.getElementById("descuentos-nombre").value.trim();
   const tipo = document.getElementById("descuentos-tipo").value;
@@ -108,6 +113,8 @@ async function guardarDescuento(event) {
     mostrarNotificacion("Ingresa un nombre y un valor entero positivo.", "error");
     return;
   }
+  form.setAttribute('aria-busy', 'true');
+  form.querySelectorAll('button').forEach(b => b.disabled = true);
   try {
     const payload = { id: id || crypto.randomUUID(), nombre, tipo, valor };
     await apiPost("descuentos", id ? "update" : "create", payload);
@@ -118,7 +125,7 @@ async function guardarDescuento(event) {
     mostrarNotificacion("Descuento guardado correctamente.", "exito");
   } catch (error) {
     mostrarNotificacion(error.message, "error");
-  }
+  } finally { form.removeAttribute('aria-busy'); form.querySelectorAll('button').forEach(b => b.disabled = false); }
 }
 
 // =====================================================================
@@ -129,14 +136,18 @@ function actualizarSelectoresFaltantes() {
   const selProv = document.getElementById("faltante-proveedor");
   const filProv = document.getElementById("filtro-faltante-proveedor");
   if (selProd) {
+    const actual = selProd.value;
     selProd.replaceChildren(new Option("Selecciona un producto...", ""));
     productos.forEach(p => selProd.add(new Option(`${p.nombre} (Stock: ${p.stock})`, p.id)));
+    selProd.value = actual;
   }
   if (selProv) {
+    const actual = selProv.value;
     selProv.replaceChildren(new Option("Sin proveedor", ""));
     gestiones.proveedores.registros.forEach(pr =>
       selProv.add(new Option(pr.nombre, pr.id))
     );
+    selProv.value = actual;
   }
   if (filProv) {
     const val = filProv.value;
@@ -148,7 +159,11 @@ function actualizarSelectoresFaltantes() {
   }
 }
 
+let secuenciaFaltantes = 0;
 async function cargarFaltantes() {
+  const secuencia = ++secuenciaFaltantes;
+  const quitarAgrupados = mostrarSkeleton(document.getElementById('faltantes-agrupados-body'), 'tabla', 5);
+  const quitarLista = mostrarSkeleton(document.getElementById('faltantes-table-body'), 'tabla', 7);
   actualizarSelectoresFaltantes();
   const tipo = document.getElementById("filtro-faltante-tipo").value;
   const proveedorId = document.getElementById("filtro-faltante-proveedor").value;
@@ -158,18 +173,20 @@ async function cargarFaltantes() {
       apiGet("faltantes", { tipo, proveedorId }),
       apiGet("faltantes/agrupados", { tipo, proveedorId }),
     ]);
+    if (secuencia !== secuenciaFaltantes) return;
 
     const bodyAgrupados = document.getElementById("faltantes-agrupados-body");
     bodyAgrupados.replaceChildren();
     agrupados.forEach(g => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td><strong>${g.nombreNormalizado}</strong> <small>(${g.descripcionReferencia})</small></td>
-        <td>${g.tipo}</td>
-        <td>${g.proveedorNombre}</td>
+        <td><strong title="Agrupado como: ${escaparHTML(g.nombreNormalizado)}">${escaparHTML(g.descripcionReferencia)}</strong></td>
+        <td>${g.tipo === 'agotado' ? 'Agotado' : 'No registrado'}</td>
+        <td>${escaparHTML(g.proveedorNombre)}</td>
         <td>${g.numeroSolicitudes}</td>
         <td><strong>${g.cantidadTotalSolicitada} un.</strong></td>
       `;
+      tr.querySelectorAll('td').forEach((td, i) => td.dataset.label = ['Producto', 'Tipo', 'Proveedor', 'Solicitudes', 'Cantidad total'][i]);
       bodyAgrupados.appendChild(tr);
     });
 
@@ -180,13 +197,14 @@ async function cargarFaltantes() {
       const fecha = new Date(f.fecha).toLocaleString("es-CO");
       tr.innerHTML = `
         <td>${fecha}</td>
-        <td>${f.productoNombre || f.descripcion}</td>
-        <td>${f.tipo}</td>
+        <td>${escaparHTML(f.productoNombre || f.descripcion)}</td>
+        <td>${escaparHTML(f.tipo)}</td>
         <td>${f.cantidadSolicitada}</td>
-        <td>${f.proveedorNombre}</td>
-        <td><strong>${f.estado}</strong></td>
+        <td>${escaparHTML(f.proveedorNombre)}</td>
+        <td><strong>${escaparHTML(f.estado)}</strong></td>
         <td></td>
       `;
+      tr.querySelectorAll('td').forEach((td, i) => td.dataset.label = ['Fecha', 'Producto', 'Tipo', 'Cantidad', 'Proveedor', 'Estado', 'Acción'][i]);
       const tdAccion = tr.lastElementChild;
       if (f.estado === "pendiente") {
         const btnResolver = document.createElement("button");
@@ -194,25 +212,29 @@ async function cargarFaltantes() {
         btnResolver.className = "btn-primary";
         btnResolver.textContent = "Marcar resuelto";
         btnResolver.addEventListener("click", async () => {
+          if (btnResolver.disabled) return;
+          btnResolver.disabled = true; btnResolver.setAttribute('aria-busy', 'true');
           try {
             await apiPost("faltantes", "update", { id: f.id, estado: "resuelto" });
             await cargarFaltantes();
             mostrarNotificacion("Faltante marcado como resuelto.", "exito");
           } catch (error) {
             mostrarNotificacion(error.message, "error");
-          }
+          } finally { btnResolver.disabled = false; btnResolver.removeAttribute('aria-busy'); }
         });
         tdAccion.appendChild(btnResolver);
       }
       bodyLista.appendChild(tr);
     });
   } catch (error) {
-    mostrarNotificacion(error.message, "error");
-  }
+    if (secuencia === secuenciaFaltantes) mostrarNotificacion(error.message, "error");
+  } finally { quitarAgrupados(); quitarLista(); }
 }
 
 async function registrarFaltante(event) {
   event.preventDefault();
+  const form = document.getElementById('faltante-form');
+  if (form.getAttribute('aria-busy') === 'true') return;
   const tipo = document.getElementById("faltante-tipo").value;
   const productoId = document.getElementById("faltante-producto").value;
   const descripcionInput = document.getElementById("faltante-descripcion").value.trim();
@@ -227,6 +249,11 @@ async function registrarFaltante(event) {
     mostrarNotificacion("Selecciona un producto o escribe la descripción del faltante.", "error");
     return;
   }
+  if (!Number.isInteger(cantidadSolicitada) || cantidadSolicitada <= 0) {
+    mostrarNotificacion('La cantidad solicitada debe ser un entero positivo.', 'error'); return;
+  }
+  form.setAttribute('aria-busy', 'true');
+  form.querySelector('button[type="submit"]').disabled = true;
 
   try {
     await apiPost("faltantes", "create", {
@@ -237,11 +264,12 @@ async function registrarFaltante(event) {
       proveedorId: proveedorId || null,
     });
     document.getElementById("faltante-form").reset();
+    document.getElementById('faltante-tipo').dispatchEvent(new Event('change'));
     await cargarFaltantes();
     mostrarNotificacion("Faltante registrado correctamente.", "exito");
   } catch (error) {
     mostrarNotificacion(error.message, "error");
-  }
+  } finally { form.removeAttribute('aria-busy'); form.querySelector('button[type="submit"]').disabled = false; }
 }
 
 // =====================================================================
@@ -255,6 +283,7 @@ async function consultarReportes(event) {
   if (!inputIni.value) inputIni.value = hoy;
   if (!inputFin.value) inputFin.value = hoy;
 
+  const quitar = mostrarSkeleton(document.getElementById('reportes-resumen-cards'), 'tarjetas');
   try {
     const data = await apiGet("reportes", {
       fechaInicio: inputIni.value,
@@ -280,7 +309,7 @@ async function consultarReportes(event) {
     (data.productosMasVendidos || []).forEach(p => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${p.nombre_historico}</td>
+        <td>${escaparHTML(p.nombre_historico)}</td>
         <td>${p.unidadesVendidas}</td>
         <td>$${Number(p.ingresosLinea).toLocaleString("es-CO")}</td>
       `;
@@ -294,7 +323,7 @@ async function consultarReportes(event) {
       tr.innerHTML = `
         <td>${referenciaVisible(c.id, "CMP")}</td>
         <td>${new Date(c.fecha).toLocaleString("es-CO")}</td>
-        <td>${c.proveedorNombre}</td>
+        <td>${escaparHTML(c.proveedorNombre)}</td>
         <td>$${Number(c.total).toLocaleString("es-CO")}</td>
       `;
       bodyCompras.appendChild(tr);
@@ -305,8 +334,8 @@ async function consultarReportes(event) {
     (data.faltantesFrecuentes || []).forEach(f => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${f.nombre_normalizado}</td>
-        <td>${f.tipo}</td>
+        <td>${escaparHTML(f.nombre_normalizado)}</td>
+        <td>${escaparHTML(f.tipo)}</td>
         <td>${f.vecesReportado}</td>
         <td>${f.unidadesSolicitadas}</td>
       `;
@@ -314,13 +343,39 @@ async function consultarReportes(event) {
     });
   } catch (error) {
     mostrarNotificacion(error.message, "error");
-  }
+  } finally { quitar(); }
 }
 
 // =====================================================================
 // INICIALIZACIÓN PRINCIPAL DOMContentLoaded
 // =====================================================================
 document.addEventListener("DOMContentLoaded", async () => {
+  abrirFormularioModal('cliente-form', 'Clientes', false, false);
+  abrirFormularioModal('proveedores-form', 'Proveedores', false, false);
+  document.getElementById('btn-nuevo-cliente-pos').addEventListener('click', () => abrirClienteModal(null, true));
+  document.getElementById('btn-nuevo-cliente').addEventListener('click', () => abrirClienteModal());
+  document.getElementById('btn-nuevo-proveedor').addEventListener('click', () => abrirFormularioModal('proveedores-form', 'Nuevo proveedor', true));
+  document.getElementById('btn-nuevo-producto-pos').addEventListener('click', () => openProductModal(null, productos, false, false, true));
+  document.getElementById('btn-descuento-puntual').addEventListener('click', () => {
+    if (!window.usuarioActual?.esAdmin) return;
+    abrirModalConFoco(document.getElementById('puntual-modal'), document.getElementById('puntual-valor'));
+  });
+  document.getElementById('puntual-form').addEventListener('submit', guardarDescuentoPuntual);
+  document.getElementById('btn-cerrar-puntual').addEventListener('click', () => document.getElementById('puntual-modal').classList.add('hidden'));
+  document.getElementById('btn-cancelar-puntual').addEventListener('click', () => document.getElementById('puntual-modal').classList.add('hidden'));
+  const actualizarFaltanteTipo = () => {
+    const agotado = document.getElementById('faltante-tipo').value === 'agotado';
+    document.getElementById('grupo-faltante-producto').hidden = !agotado;
+    document.getElementById('grupo-faltante-descripcion').hidden = agotado;
+    document.getElementById('faltante-producto').required = agotado;
+    document.getElementById('faltante-descripcion').required = !agotado;
+  };
+  document.getElementById('faltante-tipo').addEventListener('change', actualizarFaltanteTipo);
+  actualizarFaltanteTipo();
+  // Enter en el importe mueve el foco; nunca cierra una venta accidentalmente.
+  document.getElementById('monto-recibido').addEventListener('keydown', event => {
+    if (event.key === 'Enter') { event.preventDefault(); document.getElementById('btn-finalizar').focus(); }
+  });
   // Eventos de Login y Logout
   document.getElementById("login-form").addEventListener("submit", async e => {
     e.preventDefault();
@@ -328,6 +383,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     errEl.textContent = "";
     const username = document.getElementById("login-username").value.trim();
     const password = document.getElementById("login-password").value;
+    const boton = document.getElementById('btn-login-submit');
+    if (boton.disabled) return;
+    boton.disabled = true; boton.textContent = 'Ingresando…';
+    document.getElementById('login-form').setAttribute('aria-busy', 'true');
     try {
       const res = await apiAuthLogin(username, password);
       ocultarModalLogin();
@@ -338,16 +397,31 @@ document.addEventListener("DOMContentLoaded", async () => {
       mostrarNotificacion(`Bienvenido, ${res.user.nombre}`, "exito");
     } catch (error) {
       errEl.textContent = error.message;
+      document.getElementById('login-password').focus();
+    } finally {
+      boton.disabled = false; boton.textContent = 'Ingresar';
+      document.getElementById('login-form').removeAttribute('aria-busy');
     }
   });
 
   document.getElementById("btn-logout").addEventListener("click", async () => {
+    if (productosGuardando || compraPendiente || ventaPendiente || ventaAbiertaGuardadoPendiente) {
+      mostrarNotificacion('Termina la operación en curso antes de salir.', 'advertencia'); return;
+    }
+    if (factura.length && !await confirmarAccion('Hay una venta en curso. Saldrás de la sesión sin finalizarla.', { titulo: 'Cerrar sesión', aceptar: 'Salir' })) return;
+    const boton = document.getElementById('btn-logout'); boton.disabled = true;
     try {
+      guardarBorradorVenta();
       await apiAuthLogout();
-    } finally {
+      restaurandoBorrador = true;
+      factura = []; ventaEnCorreccion = null; ventaAbiertaActualId = null;
+      descuentoPuntualActual = null; document.getElementById('select-descuento').value = '';
+      renderizarFactura(); restaurandoBorrador = false; borradorPreparado = false;
       aplicarPermisosInterfaz(null);
       mostrarModalLogin();
-    }
+      mostrarNotificacion('Sesión cerrada correctamente.', 'exito');
+    } catch (error) { mostrarNotificacion('No se pudo cerrar la sesión: ' + error.message, 'error'); }
+    finally { boton.disabled = false; }
   });
 
   // Eventos de Reembolso Modal
@@ -355,6 +429,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btn-cancelar-reembolso").addEventListener("click", cerrarModalReembolso);
   document.getElementById("reembolso-form").addEventListener("submit", async e => {
     e.preventDefault();
+    const form = document.getElementById('reembolso-form');
+    if (form.getAttribute('aria-busy') === 'true') return;
     const ventaId = document.getElementById("reembolso-venta-id").value;
     const retornaInventario = document.getElementById("reembolso-retorna-stock").checked;
     const items = [];
@@ -368,6 +444,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       mostrarNotificacion("Ingresa al menos 1 unidad a reembolsar.", "error");
       return;
     }
+    const controles = [...document.querySelectorAll('#reembolso-modal button, #reembolso-modal input')].map(control => [control, control.disabled]);
+    form.setAttribute('aria-busy', 'true'); controles.forEach(([control]) => control.disabled = true);
     try {
       await apiRegistrarReembolso(ventaId, { retornaInventario, items });
       cerrarModalReembolso();
@@ -376,7 +454,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       mostrarNotificacion("Reembolso registrado correctamente.", "exito");
     } catch (error) {
       mostrarNotificacion(error.message, "error");
-    }
+    } finally { form.removeAttribute('aria-busy'); controles.forEach(([control, disabled]) => control.disabled = disabled); }
   });
 
   // Eventos de Proveedores y Categorías
@@ -591,7 +669,10 @@ function mostrarNotificacion(mensaje, tipo) {
   notificacion.classList.remove("hidden");
   notificacion.classList.remove("error");
   notificacion.classList.remove("exito");
+  notificacion.classList.remove('advertencia', 'informacion');
   notificacion.classList.add(tipo);
+  const titulos = { exito: 'Listo', error: 'No se pudo completar', advertencia: 'Atención', informacion: 'Información' };
+  notificacion.textContent = `${titulos[tipo] || 'Información'}: ${mensaje}`;
   clearTimeout(temporizadorNotificacion);
   temporizadorNotificacion = setTimeout(
     () => {

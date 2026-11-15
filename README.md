@@ -1,109 +1,143 @@
-# Papel y Luna — POS MVP 2
+# Papel y Luna — POS MVP 3
 
-Sistema de punto de venta para una papelería desarrollado con HTML, CSS y JavaScript vanilla. Productos, categorías, clientes, proveedores, ventas y compras se leen y guardan en Google Sheets mediante Google Apps Script. El navegador mantiene el carrito y las operaciones pendientes en memoria; no utiliza localStorage como fuente de datos.
+Sistema de punto de venta para una papelería, con frontend HTML/CSS/JavaScript vanilla y backend Django REST Framework.
 
-## Tecnologías y arquitectura
-
-- HTML5, CSS3 y JavaScript, sin frameworks ni librerías externas.
-- `fetch`, `async/await` y JSON para comunicarse con la API.
-- Google Apps Script como servicio y Google Sheets como almacenamiento remoto.
-- `crypto.randomUUID()` para identificadores y fechas ISO para ventas y compras.
-- Impresión y opción Guardar como PDF del navegador.
+## Arquitectura
 
 ```text
-Frontend HTML/CSS/JS → API Google Apps Script → Google Sheets
+Navegador → fetch / API REST Django → servicios de negocio → base relacional
 ```
 
-El frontend llama a `GET ?resource=...` para consultar y a `POST ?resource=...` con `{ action, data }` para crear, actualizar o eliminar. El POST usa `Content-Type: text/plain;charset=utf-8`. Se comprueba `success` y se muestran los errores del servicio.
+El navegador administra la interacción y muestra una vista previa de los importes. El backend comprueba sesión y permisos, calcula los importes oficiales y ejecuta ventas, compras, correcciones y reembolsos en transacciones.
 
-## Funcionalidades actuales
+- SQLite cuando no se configura `DATABASE_URL`.
+- Base definida por `DATABASE_URL` cuando existe; la configuración contempla PostgreSQL.
+- Google Sheets y `AppsScript.gs` corresponden a MVP 2 y no participan en el flujo actual.
+- `localStorage` se utiliza únicamente para borradores de interfaz separados por usuario.
 
-- POS con búsqueda, vista lista/catálogo, carrito, cantidades, subtotales, IVA y total.
-- Venta cerrada con Efectivo, Nequi o Debe; recibido y cambio para efectivo.
-- Cliente opcional en la venta, obligatorio para Debe.
-- Ventas abiertas: guardar, listar, retomar, editar y cerrar conservando el ID.
-- Historial remoto de ventas y factura imprimible desde el historial.
-- CRUD de productos con categoría seleccionada, costo y seguimiento de inventario.
-- Edición de nombre, categoría, precio y costo desde el POS mediante el modal existente; el stock se ajusta desde el CRUD de productos.
-- CRUD y búsqueda de clientes, proveedores y categorías.
-- Protección de eliminación para entidades con registros asociados.
-- Compras con proveedor, cantidades, costos, total, listado y detalle.
-- Descuento de stock al cerrar ventas; incremento de stock y actualización de costo con compras. Los productos sin seguimiento no cambian su stock.
-- Skeletons durante las consultas e indicador global con spinner durante las escrituras; botones de guardado deshabilitados y mensajes de error.
-- Montos derivados en pesos enteros y actualización inmediata del cambio al modificar el carrito.
+## Funcionalidades
 
-### Política monetaria
+- POS, pagos Efectivo/Nequi/Debe, recibido, cambio y factura imprimible/PDF.
+- Ventas abiertas: guardar, retomar y cerrar conservando el ID.
+- Historial compacto con detalle, correcciones y reembolsos.
+- Inventario transaccional: ventas, compras, correcciones diferenciales y devoluciones de reembolsos.
+- CRUD de productos, categorías, clientes y proveedores, con protección de relaciones.
+- Creación contextual de clientes/productos desde POS y de proveedores/productos desde Compras.
+- Descuentos reutilizables y descuentos puntuales de factura, fijos o porcentuales, sin totales negativos.
+- Faltantes, agrupación de solicitudes pendientes, filtros y resolución.
+- Reportes por fecha.
+- Autenticación por sesión y roles administrador/cajero.
+- Formularios en modales, confirmaciones, foco/teclado, skeletons y diseño responsive.
 
-El subtotal se redondea a pesos enteros, el IVA se calcula como `Math.round(subtotal * 0.19)` y el total es `subtotal + iva`. Recibido, cambio, saldos y totales de compras también se normalizan a enteros antes de guardar. Los formularios rechazan precios y costos fraccionarios sin modificar los valores originales automáticamente.
+Según P3.1 §3.8, el cajero puede editar nombre, categoría, precio y costo desde el POS. No puede administrar el catálogo ni modificar código/inventario. Definir descuentos puntuales nuevos es una acción de administrador; el cajero puede aplicar los descuentos existentes.
 
-El historial normaliza los montos al leerlos para mostrar e imprimir; esto no reescribe las filas antiguas de Sheets.
+## Tecnologías
 
-## Ejecución local
+HTML5, CSS3, JavaScript vanilla, Python, Django, Django REST Framework, django-cors-headers, python-dotenv, dj-database-url, psycopg, Gunicorn y WhiteNoise. No hay compilación ni dependencias npm del frontend.
 
-1. Descargar o clonar este repositorio y abrir su carpeta raíz.
-2. Comprobar que `API_URL` en `js/api.js` apunta a la implementación activa de Apps Script terminada en `/exec`.
-3. Servir la carpeta con un servidor HTTP local. Si tienes Python instalado:
+## Ejecución local — Windows
 
-   ```powershell
-   python -m http.server 8000 --bind 127.0.0.1
-   ```
+Desde la raíz del repositorio, con Python instalado:
 
-4. Abrir `http://localhost:8000` en un navegador moderno.
-5. Mantener conexión a Internet para consultar y guardar información en Sheets.
+```powershell
+python -m venv .venv
+& .venv/Scripts/python.exe -m pip install -r requirements.txt
+& .venv/Scripts/python.exe backend/manage.py migrate
+```
 
-No hay dependencias del frontend que instalar ni proceso de compilación. Para generar UUID se requiere HTTPS o localhost; usar el servidor local en lugar de abrir `index.html` con `file://`.
+Si necesitas variables de entorno, crea `.env` a partir de `.env.example` sin sobrescribir una configuración existente. Deja `DATABASE_URL` vacío para SQLite local. No subas `.env` ni bases de datos a Git.
 
-## Configuración del servicio
+Opcional, solo para una base de demostración:
 
-El código del servicio está incluido en `AppsScript.gs`. Implementa consultas y acciones `create`, `update` y `delete`, rechazo de IDs duplicados y bloqueo de escrituras concurrentes. Se ejecuta en Google Apps Script, no en el navegador ni en GitHub Pages.
+```powershell
+Push-Location backend
+& ../.venv/Scripts/python.exe seed_users.py
+Pop-Location
+```
 
-Para configurar el servicio, crear las pestañas y encabezados de la tabla siguiente en Google Sheets, abrir su editor de Apps Script y copiar el contenido de `AppsScript.gs`. Publicar como aplicación web, ejecutada como propietario y accesible para cualquier persona, según la guía del curso. Copiar la URL terminada en `/exec` a `API_URL` en `js/api.js`. Después de cambiar el servicio, publicar una nueva versión de la implementación.
+El script crea los usuarios y, si no hay productos, datos iniciales. **Cada ejecución vuelve a establecer las contraseñas demo**; no lo ejecutes sin revisar en un entorno con usuarios reales.
 
-| Recurso | Encabezados |
+```powershell
+& .venv/Scripts/python.exe backend/manage.py runserver 127.0.0.1:8000
+```
+
+Abrir `http://127.0.0.1:8000/`. Django sirve la interfaz y `/api/` desde el mismo origen. No es necesario iniciar Live Server.
+
+### Usuarios de demostración del script
+
+| Rol | Usuario | Contraseña local de demostración |
+|---|---|---|
+| Administrador | admin | AdminDemo2026! |
+| Cajero | cajero | CajeroDemo2026! |
+
+Estos valores describen el script del repositorio; no confirman las credenciales del servicio desplegado.
+
+## API y organización
+
+`js/api.js` centraliza las peticiones REST, timeout, cookies de sesión y errores HTTP. Los recursos principales son `productos`, `categorias`, `clientes`, `proveedores`, `ventas`, `compras`, `descuentos`, `faltantes` y `reportes`.
+
+| Ubicación | Responsabilidad |
 |---|---|
-| productos | id, codigo, nombre, categoriaId, precio, costo, seguimientoInventario, stock |
-| categorias | id, nombre |
-| clientes | id, nombre, telefono, correo |
-| proveedores | id, nombre, telefono, correo |
-| ventas | id, fecha, estado, clienteId, metodoPago, subtotal, total, valorRecibido, cambio, itemsJson, actualizadoEn |
-| compras | id, fecha, proveedorId, total, itemsJson |
+| index.html / css/Style.css | Vistas, formularios, responsive y presentación |
+| js/app.js | Sesión, navegación, conexión de eventos, descuentos de catálogo, faltantes y reportes |
+| js/pos.js | Carrito, cálculo de vista previa, pagos y cierre/corrección |
+| js/productos.js / clientes.js / gestion.js | Formularios y operaciones CRUD reutilizados |
+| js/compras.js | Registro y consulta de compras |
+| js/historial.js / ventas-abiertas.js | Consulta, impresión, reembolsos y recuperación de abiertas |
+| js/borrador-venta.js | Borradores locales por usuario, sin catálogo persistido |
+| js/ui.js / loading.js | Diálogos, foco, confirmaciones, indicadores y skeletons |
+| backend/config/ | Configuración, rutas raíz y entrada WSGI |
+| backend/tienda/urls.py | Rutas REST |
+| backend/tienda/views.py / permissions.py | Peticiones, sesión y autorización |
+| backend/tienda/serializers.py | Transformación JSON y validación de CRUD |
+| backend/tienda/services.py | Reglas del negocio y transacciones |
+| backend/tienda/models.py / migrations/ | Tablas, relaciones y evolución del esquema |
+| backend/tienda/tests.py | Pruebas automatizadas del backend |
 
-La aplicación también usa `descripcion` e `imagenes` en productos: agregar ambas columnas para conservar esos campos en Sheets. `categoriaId`, `clienteId` y `proveedorId` referencian registros existentes. Los productos migrados del MVP 1 deben tener `categoriaId` válido. Los datos iniciales se cargan en Sheets, no en el frontend.
+Los importes se guardan en pesos enteros. El IVA se redondea al peso más cercano y el descuento se aplica al total con IVA, con piso de cero. La factura conserva los datos históricos del descuento.
 
-## Organización del código
+El campo opcional `descuentoPersonalizado: { tipo, valor }` permite un descuento puntual sin crear registros en el catálogo. Se utiliza en las rutas de venta existentes; no requiere una migración de base de datos.
 
-| Archivo | Responsabilidad |
+## Pruebas y guía de estudio
+
+```powershell
+& .venv/Scripts/python.exe backend/manage.py test tienda
+```
+
+Para ejecutar Chrome contra una base desechable, iniciar en otra terminal:
+
+```powershell
+& .venv/Scripts/python.exe tests/serve-mvp3.py
+```
+
+Y luego, con Chrome instalado y Node con WebSocket global:
+
+```powershell
+node tests/run-browser.cjs 1366 --mvp3
+node tests/run-browser.cjs 768 --mvp3
+node tests/run-browser.cjs 390 --mvp3
+```
+
+El servidor de pruebas usa SQLite temporal en el puerto 8765, sin tocar la base local ni Render. Terminarlo con Ctrl+C.
+
+- [Guía técnica para estudiar el proyecto](docs/GUIA_TECNICA_MVP3.md).
+- [Diagnóstico, cambios, pruebas y validación manual](docs/AUDITORIA_UX_MVP3.md).
+
+Las pruebas de `post-mvp2.test.cjs` y `browser-post-mvp2.js` corresponden al contrato anterior de Apps Script; no se presentan como pruebas de la API Django.
+
+## Despliegue y límites conocidos
+
+El código contempla Render, pero el despliegue no se ha verificado desde esta revisión. La presencia de Gunicorn o de `.onrender.com` en la configuración no demuestra que el servicio esté publicado.
+
+| Dirección | Valor |
 |---|---|
-| index.html / css/Style.css | Vistas, formularios y estilos |
-| js/api.js | URL, peticiones, timeout y reintentos limitados |
-| js/loading.js | Contador de operaciones remotas, overlay para escrituras y skeletons para consultas |
-| js/app.js | Inicialización, navegación y conexión de eventos |
-| js/pos.js | Catálogo, carrito, pagos y cierre de ventas con stocks objetivo |
-| js/ventas-abiertas.js | Guardado y recuperación de ventas abiertas |
-| js/productos.js | Tabla CRUD y modal de productos reutilizado desde POS |
-| js/historial.js | Historial remoto, adaptación de ventas y factura imprimible |
-| js/clientes.js | CRUD de clientes y selector del POS |
-| js/gestion.js | CRUD compartido de proveedores y categorías, y comprobación de relaciones |
-| js/compras.js | Registro de compras, objetivos de inventario/costo, listado y detalle |
-| AppsScript.gs | Servicio de Google Sheets: lectura, creación, actualización, eliminación y control de IDs |
-| imagenes/ | Recursos visuales; las rutas se obtienen de los productos del servicio |
+| Frontend | Pendiente de completar/verificar |
+| Backend/API | Pendiente de completar/verificar |
+| Comprobación del servicio | `/api/health/` |
 
-## Reintentos y limitaciones
+Antes de publicar, verificar variables de entorno, `DEBUG=False`, `SECRET_KEY`, base de datos, hosts y sesión/HTTPS. La autenticación actual exime CSRF: es una limitación que requiere revisión antes de operar con datos reales.
 
-- Cada petición tiene timeout, incluida la lectura de la respuesta. GET tiene hasta tres intentos y UPDATE hasta dos; CREATE y DELETE no se repiten automáticamente.
-- Si una creación devuelve un error después de haberse guardado, se consulta el mismo UUID en el servicio antes de continuar o volver a intentar manualmente.
-- Stocks y costos objetivo se calculan una sola vez por operación. Un reintento envía los mismos valores absolutos para evitar aplicar dos veces el movimiento.
-- El estado local se actualiza cuando se confirman las escrituras. Un error del historial conserva el último historial válido.
-- Sheets no proporciona una transacción conjunta de venta/compra e inventario: una operación puede quedar parcialmente guardada. La interfaz conserva la operación pendiente en memoria para reintentar. No recargar ni cerrar la página mientras esa recuperación esté pendiente.
-- El inventario parte de la copia cargada en el navegador; escrituras simultáneas desde varios equipos pueden entrar en conflicto. La demostración debe hacerse con un solo operador.
-- La API es pública y no implementa autenticación ni roles. Usar datos de demostración; autenticación corresponde al MVP 3.
-
-## Validación de entrega
-
-- La revisión local de sintaxis de los diez archivos JavaScript y de `AppsScript.gs` pasó; las referencias de scripts y CSS del HTML existen.
-- Se comprobaron con API simulada los montos derivados, el contador de carga y la retirada de skeletons. Estas comprobaciones no sustituyen las pruebas del servicio publicado.
-- Antes de entregar, probar en la URL pública: venta cerrada e impresión, venta abierta y cierre con el mismo ID, cliente obligatorio para Debe, compra e inventario, edición de categorías y protección de relaciones.
-- Comprobar navegación móvil, retirada de skeletons al terminar o fallar una consulta y correspondencia de los registros con Sheets.
+Los tests con SQLite no prueban la concurrencia por filas de PostgreSQL. Una respuesta perdida y los movimientos concurrentes requieren validación adicional en el despliegue. No se recupera automáticamente como nueva una venta cuyo guardado quedó incierto; se advierte al usuario para revisar el historial.
 
 ## Integrantes
 
@@ -111,61 +145,8 @@ La aplicación también usa `descripcion` e `imagenes` en productos: agregar amb
 - Jacobo
 - Jero
 
-## URL desplegada
+Completar los nombres completos y las URLs verificadas para la entrega.
 
-**Pendiente:** reemplazar este texto por la URL HTTPS del frontend publicado y verificado.
+## Entrega del curso
 
-La URL del frontend abre la aplicación; es distinta de `API_URL`, que recibe las peticiones de datos.
-
-## Entrega MVP 2
-
-- Mantener el mismo repositorio del MVP 1, con commits visibles de todos los integrantes.
-- Publicar el frontend en GitHub Pages u otra plataforma gratuita y comprobar los flujos en la URL pública, también en móvil.
-- Completar la URL anterior y preparar `desarrollo-web-2026-2-parcial2-apellidoA-apellidoB-apellidoC.zip` con código fuente, README y recursos, sin dependencias instaladas ni carpetas de compilación.
-- Incluir `index.html`, `README.md`, `AppsScript.gs`, `js/`, `css/` e `imagenes/` en el ZIP; excluir `.git/`.
-- Verificar que `AppsScript.gs` corresponda a la versión publicada del servicio y completar los nombres de los integrantes antes de entregar.
-
-
-El alcance de esta entrega se toma del documento MVP 2. Descuentos, reembolsos, correcciones de ventas cerradas, reportes, autenticación, roles y backend propio quedan para MVP 3.
-# 🌙 Papel y Luna — Sistema POS Full-Stack (MVP 3)
-
-Sistema de Punto de Venta (POS) y gestión administrativa para la papelería **Papel y Luna**, desarrollado en tres iteraciones incrementales (MVP 1 → MVP 2 → MVP 3).
-
-En esta entrega final (**MVP 3**), el sistema evoluciona desde Google Apps Script / Google Sheets hacia una arquitectura **Full-Stack con Backend propio en Django, API REST y Base de Datos Relacional (SQLite en desarrollo / PostgreSQL en Render)**.
-
----
-
-## 1. Arquitectura del Sistema
-
-```text
-papel-y-luna/
-├── index.html                  # Interfaz SPA en HTML5
-├── css/Style.css               # Estilos responsive
-├── imagenes/                   # Catálogo visual de productos
-├── js/                         # Módulos Frontend (JavaScript Vanilla)
-│   ├── api.js                  # Cliente HTTP REST + Sesiones
-│   ├── app.js                  # Autenticación, Roles, Descuentos, Faltantes y Reportes
-│   ├── pos.js                  # Flujo de caja, descuentos en vivo y modo corrección
-│   ├── productos.js            # CRUD de productos e inventario
-│   ├── clientes.js             # CRUD de clientes
-│   ├── compras.js              # Registro de compras y aumento transaccional de stock
-│   ├── gestion.js              # CRUD de categorías y proveedores
-│   ├── historial.js            # Historial, reimpresión, correcciones y reembolsos
-│   ├── ventas-abiertas.js      # Guardado y recuperación de ventas abiertas
-│   ├── borrador-venta.js       # Recuperación de borrador local ante recargas
-│   └── loading.js              # Indicadores de carga y skeletons
-├── backend/                    # Backend Django + Django REST Framework
-│   ├── manage.py
-│   ├── seed_users.py           # Precarga de usuarios Administrador y Cajero
-│   ├── config/                 # Configuración global, CORS, BD y rutas raíz
-│   └── tienda/                 # Aplicación principal del negocio
-│       ├── models.py           # 12 modelos relacionales con integridad PROTECT
-│       ├── serializers.py      # Validación y transformación JSON
-│       ├── services.py         # Lógica de negocio y transacciones atómicas
-│       ├── permissions.py      # Autorización en servidor por rol (ADMIN / CAJERO)
-│       ├── views.py            # Controladores REST
-│       ├── urls.py             # Endpoints bajo /api/
-│       └── tests.py            # Pruebas integrales automatizadas
-├── requirements.txt
-├── .env.example
-└── .gitignore
+Según P3.1, conservar el mismo repositorio con contribuciones visibles de los integrantes y entregar `web-2026-2-mvp3-apellidoA-apellidoB-apellidoC.zip` con frontend, backend, README e inicialización. Excluir `.git/`, `.venv/`, bases de datos, secretos, cachés y archivos generados de pruebas.

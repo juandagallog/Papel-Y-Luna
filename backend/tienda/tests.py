@@ -341,3 +341,107 @@ class PapelYLunaMVP3Tests(TestCase):
             self.client.get("/api/reportes/").status_code,
             403,
         )
+
+    def crear_venta_prueba(self, **extra):
+        payload = {"estado": "cerrada", "metodoPago": "Nequi",
+                   "items": [{"productoId": self.producto.id, "cantidad": 2}], **extra}
+        return self.client.post("/api/ventas/", payload, format="json")
+
+    def test_cajero_edicion_en_caliente_con_limites_servidor(self):
+        self.login_cajero()
+        ruta = f"/api/productos/{self.producto.id}/"
+        respuesta = self.client.put(ruta, {"nombre": "Cuaderno actualizado", "categoriaId": self.categoria.id,
+                                         "precio": 150, "costo": 100}, format="json")
+        self.assertEqual(respuesta.status_code, 200)
+        for campo, valor in (("stock", 999), ("codigo", "CAMBIADO"), ("seguimientoInventario", False), ("id", "otro-id")):
+            with self.subTest(campo=campo):
+                self.assertEqual(self.client.patch(ruta, {campo: valor}, format="json").status_code, 403)
+        self.assertEqual(self.client.post('/api/productos/', {}, format='json').status_code, 403)
+        self.assertEqual(self.client.delete(ruta).status_code, 403)
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock, 10)
+        self.assertEqual(self.producto.codigo, "PROD-001")
+
+    def test_correcciones_sucesivas_conservan_id_y_ajustan_diferencias(self):
+        self.login_admin()
+        venta = self.crear_venta_prueba().data
+        ruta = f"/api/ventas/{venta['id']}/corregir/"
+        for cantidad in (1, 4, 2):
+            respuesta = self.client.post(ruta, {"metodoPago": "Nequi", "items": [{"productoId": self.producto.id, "cantidad": cantidad}]}, format="json")
+            self.assertEqual(respuesta.status_code, 200)
+            self.assertEqual(respuesta.data["id"], venta["id"])
+            self.assertTrue(respuesta.data["corregida"])
+            self.producto.refresh_from_db()
+            self.assertEqual(self.producto.stock, 10 - cantidad)
+        self.assertEqual(Venta.objects.count(), 1)
+
+    def test_descuento_puntual_sin_catalogo_y_total_cero(self):
+        self.login_admin()
+        cantidad_descuentos = Descuento.objects.count()
+        r = self.crear_venta_prueba(descuentoPersonalizado={"tipo": "fijo", "valor": 999999})
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.data["total"], 0)
+        self.assertEqual(r.data["descuentoNombre"], "Descuento puntual")
+        self.assertEqual(r.data["descuentoValor"], 999999)
+        self.assertEqual(r.data["descuentoId"], "")
+        self.assertEqual(Descuento.objects.count(), cantidad_descuentos)
+        historica = self.client.get(f"/api/ventas/{r.data['id']}/").data
+        self.assertEqual(historica["total"], 0)
+
+    def test_puntual_porcentaje_y_reembolso_proporcional(self):
+        self.login_admin()
+        r = self.crear_venta_prueba(descuentoPersonalizado={"tipo": "porcentaje", "valor": 10})
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.data["total"], 21420)
+        reembolso = self.client.post(f"/api/ventas/{r.data['id']}/reembolsos/",
+                                   {"items": [{"productoId": self.producto.id, "cantidad": 1}], "retornaInventario": True}, format="json")
+        self.assertEqual(reembolso.status_code, 201)
+        self.assertEqual(reembolso.data["totalReembolsado"], 10710)
+
+    def test_cajero_no_define_descuento_puntual(self):
+        self.login_cajero()
+        r = self.crear_venta_prueba(descuentoPersonalizado={"tipo": "fijo", "valor": 100})
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(Venta.objects.count(), 0)
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock, 10)
+
+    def test_puntual_invalido_revierte_operacion(self):
+        self.login_admin()
+        for descuento in ({"tipo": "porcentaje", "valor": 101}, {"tipo": "fijo", "valor": -1},
+                          {"tipo": "fijo", "valor": 1.5}, {"tipo": "fijo", "valor": True},
+                          {"tipo": "fijo", "valor": 10**30}, {"tipo": "otro", "valor": 5}):
+            r = self.crear_venta_prueba(descuentoPersonalizado=descuento)
+            self.assertEqual(r.status_code, 400)
+        self.assertEqual(Venta.objects.count(), 0)
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock, 10)
+
+    def test_cajero_cierra_abierta_con_descuento_ya_autorizado(self):
+        self.login_admin()
+        r = self.crear_venta_prueba(estado="abierta", descuentoPersonalizado={"tipo": "fijo", "valor": 1000})
+        self.assertEqual(r.status_code, 201)
+        self.login_cajero()
+        cerrar = self.client.put(f"/api/ventas/{r.data['id']}/", {"estado": "cerrada", "metodoPago": "Nequi",
+                            "descuentoPersonalizado": {"tipo": "fijo", "valor": 1000},
+                            "items": [{"productoId": self.producto.id, "cantidad": 2}]}, format="json")
+        self.assertEqual(cerrar.status_code, 200)
+        self.assertEqual(cerrar.data["total"], 22800)
+
+    def test_correccion_conserva_puntual_si_no_se_cambia(self):
+        self.login_admin()
+        r = self.crear_venta_prueba(descuentoPersonalizado={"tipo": "porcentaje", "valor": 10})
+        corregida = self.client.post(f"/api/ventas/{r.data['id']}/corregir/",
+                       {"items": [{"productoId": self.producto.id, "cantidad": 1}]}, format="json")
+        self.assertEqual(corregida.status_code, 200)
+        self.assertEqual(corregida.data["total"], 10710)
+        self.assertEqual(corregida.data["descuentoValor"], 10)
+
+    def test_redondeo_coincide_con_math_round_del_pos(self):
+        self.login_admin()
+        self.producto.precio = 150
+        self.producto.save()
+        r = self.crear_venta_prueba(items=[{"productoId": self.producto.id, "cantidad": 1}])
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.data["iva"], 29)
+        self.assertEqual(r.data["total"], 179)

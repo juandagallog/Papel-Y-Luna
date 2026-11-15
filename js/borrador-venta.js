@@ -4,6 +4,9 @@ const CLAVE_ESCRITURA_BORRADOR = 'papel-luna:venta-borrador:escritura:v1';
 let borradorPreparado = false;
 let restaurandoBorrador = false;
 let avisoBorradorEmitido = false;
+let temporizadorBorrador;
+let eventosBorradorInstalados = false;
+function claveBorradorUsuario(base) { return `${base}:usuario:${window.usuarioActual?.id || 'sin-sesion'}`; }
 
 function accederBorrador(operacion) {
   try { return operacion(localStorage); }
@@ -18,40 +21,48 @@ function accederBorrador(operacion) {
 
 function eliminarBorradorVenta() {
   accederBorrador(storage => {
-    storage.removeItem(CLAVE_BORRADOR_VENTA);
-    storage.removeItem(CLAVE_ESCRITURA_BORRADOR);
+    storage.removeItem(claveBorradorUsuario(CLAVE_BORRADOR_VENTA));
+    storage.removeItem(claveBorradorUsuario(CLAVE_ESCRITURA_BORRADOR));
   });
 }
 
 function guardarBorradorVenta() {
-  if (!borradorPreparado || restaurandoBorrador || ventaAbiertaActualId || ventaPendiente || ventaAbiertaGuardadoPendiente) return;
+  if (!window.usuarioActual || !borradorPreparado || restaurandoBorrador || ventaEnCorreccion || ventaAbiertaActualId || ventaPendiente || ventaAbiertaGuardadoPendiente) return;
   if (!factura.length) { eliminarBorradorVenta(); return; }
   const borrador = {
     items: factura.map(item => ({ productoId: item.id, cantidad: item.cantidad })),
     clienteId: document.getElementById('select-cliente').value,
     metodoPago: selectPago.value,
     valorRecibido: Math.round(Number(inputRecibido.value) || 0),
+    ...payloadDescuentoFactura(),
     actualizadoEn: new Date().toISOString()
   };
-  accederBorrador(storage => storage.setItem(CLAVE_BORRADOR_VENTA, JSON.stringify(borrador)));
+  accederBorrador(storage => storage.setItem(claveBorradorUsuario(CLAVE_BORRADOR_VENTA), JSON.stringify(borrador)));
 }
 
 // No recuperamos como nueva una venta cuyo guardado pudo llegar al servicio.
 // Esto solo marca el borrador; no reemplaza los reintentos ni los stocks objetivo.
 function marcarEscrituraBorrador(id) {
-  accederBorrador(storage => storage.setItem(CLAVE_ESCRITURA_BORRADOR, String(id)));
+  accederBorrador(storage => storage.setItem(claveBorradorUsuario(CLAVE_ESCRITURA_BORRADOR), String(id)));
 }
 
-function iniciarBorradorVenta() {
-  if (borradorPreparado || !catalogoCargado || !clientesCargados) return;
+async function iniciarBorradorVenta() {
+  if (borradorPreparado || !window.usuarioActual || !catalogoCargado || !clientesCargados) return;
   borradorPreparado = true;
+  if (!eventosBorradorInstalados) {
+  eventosBorradorInstalados = true;
   document.getElementById('select-cliente').addEventListener('change', guardarBorradorVenta);
   selectPago.addEventListener('change', guardarBorradorVenta);
-  inputRecibido.addEventListener('input', guardarBorradorVenta);
-  const texto = accederBorrador(storage => storage.getItem(CLAVE_BORRADOR_VENTA));
-  const escritura = accederBorrador(storage => storage.getItem(CLAVE_ESCRITURA_BORRADOR));
+  inputRecibido.addEventListener('input', () => {
+    clearTimeout(temporizadorBorrador);
+    temporizadorBorrador = setTimeout(guardarBorradorVenta, 200);
+  });
+  window.addEventListener('pagehide', guardarBorradorVenta);
+  }
+  const texto = accederBorrador(storage => storage.getItem(claveBorradorUsuario(CLAVE_BORRADOR_VENTA)));
+  const escritura = accederBorrador(storage => storage.getItem(claveBorradorUsuario(CLAVE_ESCRITURA_BORRADOR)));
   if (escritura) {
-    mostrarNotificacion('Hubo una venta en proceso de guardado antes de recargar. Revisa el historial y Sheets antes de volver a vender; no se recuperará como una venta nueva.', 'error');
+    mostrarNotificacion('Hubo una venta en proceso de guardado antes de recargar. Revisa el historial antes de volver a vender; no se recuperará como una venta nueva.', 'advertencia');
     return;
   }
   if (!texto) { guardarBorradorVenta(); return; }
@@ -66,7 +77,10 @@ function iniciarBorradorVenta() {
   }
   if (!borrador.items.length) { eliminarBorradorVenta(); return; }
   // Evita sustituir un carrito que el usuario haya comenzado durante la carga.
-  if (factura.length || !window.confirm('Encontramos una venta sin finalizar.\n¿Deseas recuperarla?')) {
+  restaurandoBorrador = true;
+  const recuperar = !factura.length && await confirmarAccion('Encontramos una venta sin finalizar. ¿Deseas recuperarla?', { titulo: 'Recuperar borrador', aceptar: 'Recuperar venta' });
+  restaurandoBorrador = false;
+  if (!recuperar) {
     eliminarBorradorVenta(); guardarBorradorVenta(); return;
   }
   restaurandoBorrador = true;
@@ -91,6 +105,11 @@ function iniciarBorradorVenta() {
     document.getElementById('select-cliente').value = clientes.some(c => c.id === clienteId) ? clienteId : '';
     if (clienteId && !clientes.some(c => c.id === clienteId)) avisos.push('El cliente ya no existe; selecciona otro si corresponde.');
     selectPago.value = ['Efectivo', 'Nequi', 'Debe'].includes(borrador.metodoPago) ? borrador.metodoPago : 'Efectivo';
+    if (borrador.descuentoId && descuentosCatalogo.some(d => d.id === borrador.descuentoId)) document.getElementById('select-descuento').value = borrador.descuentoId;
+    if (borrador.descuentoPersonalizado && window.usuarioActual?.esAdmin) {
+      descuentoPuntualActual = { ...borrador.descuentoPersonalizado };
+      actualizarSelectDescuentosPOS(); document.getElementById('select-descuento').value = '__puntual__';
+    }
     selectPago.dispatchEvent(new Event('change'));
     const recibido = Number(borrador.valorRecibido);
     inputRecibido.value = selectPago.value === 'Efectivo' && Number.isFinite(recibido) && recibido >= 0 ? Math.round(recibido) : '';

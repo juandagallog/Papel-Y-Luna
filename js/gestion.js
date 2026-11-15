@@ -46,6 +46,7 @@ function renderGestion(resource) {
       const actual = gestion.registros.find(registro => registro.id === r.id);
       if (!actual) return;
       ['id', ...gestion.campos].forEach(c => document.getElementById(`${resource}-${c}`).value = actual[c]);
+      if (resource === 'proveedores') abrirFormularioModal('proveedores-form', 'Editar proveedor');
       const nombre = document.getElementById(`${resource}-nombre`);
       nombre.scrollIntoView({ block: 'center' });
       nombre.focus({ preventScroll: true });
@@ -58,7 +59,8 @@ function renderGestion(resource) {
 
 function bloquearGestion(resource, valor) {
   gestiones[resource].guardando = valor;
-  document.querySelectorAll(`#vista-${resource} button, #${resource}-form input`).forEach(e => e.disabled = valor);
+  document.querySelectorAll(`#vista-${resource} button, #${resource}-form input, #${resource}-form button`).forEach(e => e.disabled = valor);
+  indicarFormularioOcupado(`${resource}-form`, valor);
   document.getElementById(`${resource}-estado`).textContent = valor ? 'Guardando cambios...' : '';
   renderGestion(resource);
 }
@@ -111,6 +113,10 @@ async function guardarGestion(resource, event, desdeCompra = false) {
     if (index < 0) gestion.registros.push(guardado); else gestion.registros[index] = guardado;
     document.getElementById(desdeCompra ? 'nuevo-proveedor-form' : `${resource}-form`).reset(); idInput.value = '';
     sincronizarGestion(resource);
+    if (!desdeCompra && resource === 'proveedores') {
+      indicarFormularioOcupado('proveedores-form', false);
+      cerrarFormularioModal('proveedores-form');
+    }
     if (desdeCompra) {
       document.getElementById('compra-proveedor').value = guardado.id;
       document.getElementById('nuevo-proveedor-modal').classList.add('hidden');
@@ -128,8 +134,7 @@ function abrirProveedorDesdeCompra() {
   if (gestiones.proveedores.guardando || gestiones.proveedores.cargando || productosGuardando || compraPendiente || ventaPendiente || ventaAbiertaGuardadoPendiente) return;
   document.getElementById('nuevo-proveedor-form').reset();
   document.getElementById('nuevo-proveedor-id').value = '';
-  document.getElementById('nuevo-proveedor-modal').classList.remove('hidden');
-  document.getElementById('nuevo-proveedor-nombre').focus();
+  abrirModalConFoco(document.getElementById('nuevo-proveedor-modal'), document.getElementById('nuevo-proveedor-nombre'));
 }
 
 function cerrarProveedorDesdeCompra() {
@@ -141,7 +146,7 @@ function cerrarProveedorDesdeCompra() {
 async function eliminarGestion(resource, registro) {
   const gestion = gestiones[resource];
   if (gestion.guardando || gestion.cargando || productosGuardando || ventaPendiente || ventaAbiertaGuardadoPendiente || compraPendiente) return;
-  if (!window.confirm(`¿Eliminar ${registro.nombre}?`)) return;
+  if (!await confirmarAccion(`¿Eliminar ${registro.nombre}?`, { titulo: 'Eliminar registro', aceptar: 'Eliminar', peligrosa: true })) return;
   bloquearGestion(resource, true);
   try {
     const asociados = await apiGet(resource === 'proveedores' ? 'compras' : 'productos');

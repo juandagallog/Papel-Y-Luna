@@ -302,10 +302,11 @@ class ProductoDetailView(BaseCatalogoDetailView):
 
         # Si el usuario es CAJERO, solo puede editar producto desde el POS (sin tocar inventario)
         if not es_admin(request.user):
-            if "stock" in datos or "seguimientoInventario" in datos or "seguimiento_inventario" in datos:
+            permitidos = {"id", "nombre", "categoriaId", "precio", "costo"}
+            if set(datos) - permitidos or ("id" in datos and str(datos["id"]) != str(pk)):
                 return Response(
                     {
-                        "message": "El rol Cajero solo puede editar datos básicos del producto desde el POS, no el inventario."
+                        "message": "El cajero puede editar nombre, categoría, precio y costo desde el POS; no código ni inventario."
                     },
                     status=status.HTTP_403_FORBIDDEN,
                 )

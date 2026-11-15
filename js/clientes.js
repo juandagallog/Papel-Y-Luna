@@ -2,6 +2,14 @@ let clientes = [];
 let clientesCargados = false;
 let clientesEnCarga = null;
 let clienteGuardando = false;
+let clienteDesdePOS = false;
+
+function abrirClienteModal(cliente = null, desdePOS = false) {
+  if (clienteGuardando || clientesEnCarga) return;
+  clienteDesdePOS = desdePOS;
+  abrirFormularioModal('cliente-form', cliente ? 'Editar cliente' : 'Nuevo cliente', !cliente);
+  if (cliente) ['id', 'nombre', 'telefono', 'correo'].forEach(campo => document.getElementById(`cliente-${campo}`).value = cliente[campo]);
+}
 
 function nombreCliente(id) {
   return clientes.find(c => c.id === String(id))?.nombre || (id ? `Cliente ${id}` : "Sin cliente");
@@ -35,7 +43,7 @@ function renderClientes() {
     editar.disabled = clienteGuardando;
     editar.addEventListener('click', () => {
       if (clienteGuardando) return;
-      ['id', 'nombre', 'telefono', 'correo'].forEach(campo => document.getElementById(`cliente-${campo}`).value = c[campo]);
+      abrirClienteModal(c);
     });
     const eliminar = document.createElement('button');
     eliminar.type = 'button'; eliminar.className = 'btn-eliminar'; eliminar.textContent = 'Eliminar';
@@ -48,7 +56,8 @@ function renderClientes() {
 function bloquearClientes(bloqueado) {
   clienteGuardando = bloqueado;
   document.getElementById('clientes-estado').textContent = bloqueado ? 'Guardando cambios...' : '';
-  document.querySelectorAll('#vista-clientes button, #cliente-form input').forEach(e => e.disabled = bloqueado);
+  document.querySelectorAll('#vista-clientes button, #cliente-form input, #cliente-form button').forEach(e => e.disabled = bloqueado);
+  indicarFormularioOcupado('cliente-form', bloqueado);
   renderClientes();
 }
 
@@ -111,6 +120,13 @@ async function guardarCliente(event) {
     if (index < 0) clientes.push(actualizado); else clientes[index] = actualizado;
     document.getElementById('cliente-form').reset(); idInput.value = '';
     actualizarSelectClientes();
+    if (clienteDesdePOS) {
+      document.getElementById('select-cliente').value = actualizado.id;
+      guardarBorradorVenta();
+    }
+    // Cerrar después de liberar aria-busy en finally, sin borrar campos si falla.
+    indicarFormularioOcupado('cliente-form', false);
+    cerrarFormularioModal('cliente-form');
     mostrarNotificacion('Cliente guardado correctamente.', 'exito');
   } catch (error) { mostrarNotificacion(error.message, 'error'); }
   finally { bloquearClientes(false); }
@@ -118,7 +134,7 @@ async function guardarCliente(event) {
 
 async function eliminarCliente(cliente) {
   if (clienteGuardando || clientesEnCarga || productosGuardando || ventaPendiente || ventaAbiertaGuardadoPendiente) return;
-  if (!window.confirm(`¿Eliminar a ${cliente.nombre}?`)) return;
+  if (!await confirmarAccion(`¿Eliminar a ${cliente.nombre}?`, { titulo: 'Eliminar cliente', aceptar: 'Eliminar', peligrosa: true })) return;
   bloquearClientes(true);
   try {
     const ventas = await apiGet('ventas');

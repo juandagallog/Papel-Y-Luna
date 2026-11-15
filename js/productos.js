@@ -8,6 +8,7 @@ validaciones
 let productoAEliminarId = null;
 let edicionProductoDesdePOS = false;
 let creacionProductoDesdeCompra = false;
+let creacionProductoDesdePOS = false;
 
 // Renderiza la tabla CRUD
 function renderTablaCRUD(listaProductos) {
@@ -23,15 +24,15 @@ listaProductos.forEach(prod => {
     }
     const tr = document.createElement('tr');
     tr.innerHTML = `
-    <td><strong>${prod.codigo}</strong></td>
-    <td>${prod.nombre}</td>
-    <td>${prod.categoria}</td>
+    <td><strong>${escaparHTML(prod.codigo)}</strong></td>
+    <td>${escaparHTML(prod.nombre)}</td>
+    <td>${escaparHTML(prod.categoria)}</td>
     <td>$${prod.precio.toLocaleString('es-CO')}</td>
     <td>$${(prod.costo || 0).toLocaleString('es-CO')}</td>
     <td>${textoStock}</td>
     <td>
-        <button type="button" class="btn-editar" data-id="${prod.id}">✏️</button>
-        <button type="button" class="btn-eliminar" data-id="${prod.id}">🗑️</button>
+        <button type="button" class="btn-editar" data-id="${escaparHTML(prod.id)}">✏️</button>
+        <button type="button" class="btn-eliminar" data-id="${escaparHTML(prod.id)}">🗑️</button>
     </td>
     `;
     productsTableBody.appendChild(tr);
@@ -53,6 +54,7 @@ const modal = document.getElementById('product-modal');
 if (modal) modal.classList.add('hidden');
 if (creacionProductoDesdeCompra) document.getElementById('btn-nuevo-producto-compra').focus();
 creacionProductoDesdeCompra = false;
+creacionProductoDesdePOS = false;
 }
 
 // Cierra el modal de confirmación de eliminación
@@ -74,14 +76,19 @@ if (trackCheckbox && stockInput) {
 }
 
 // Abre el modal (vacío para crear, o lleno para editar)
-function openProductModal(productId = null, listaProductos = [], desdePOS = false, desdeCompra = false) {
+function openProductModal(productId = null, listaProductos = [], desdePOS = false, desdeCompra = false, crearEnPOS = false) {
 const modal = document.getElementById('product-modal');
 const form = document.getElementById('product-form');
 if (!modal || !form || !catalogoCargado || productosGuardando || ventaPendiente || ventaAbiertaGuardadoPendiente || compraPendiente) return;
+if (!window.usuarioActual || (!window.usuarioActual.esAdmin && (!productId || !desdePOS))) {
+    mostrarNotificacion('Tu rol permite editar datos básicos desde el POS, pero no administrar productos.', 'error'); return;
+}
 
 form.reset();
 edicionProductoDesdePOS = desdePOS;
 creacionProductoDesdeCompra = desdeCompra;
+creacionProductoDesdePOS = crearEnPOS;
+document.getElementById('product-description').disabled = !window.usuarioActual.esAdmin;
 document.getElementById('track-inventory').disabled = desdePOS;
 
 if (productId) {
@@ -115,8 +122,7 @@ if (productId) {
 }
 
 if (desdePOS) document.getElementById('product-stock').disabled = true;
-modal.classList.remove('hidden');
-document.getElementById('product-name').focus();
+abrirModalConFoco(modal, document.getElementById('product-name'));
 }
 
 // Procesa el envío del formulario (Crear o Modificar en el arreglo)
@@ -125,6 +131,8 @@ async function handleFormSubmit(event, listaProductos) {
     if (!catalogoCargado || productosGuardando || ventaPendiente || ventaAbiertaGuardadoPendiente || compraPendiente) return;
 
     const id = document.getElementById('product-id').value;
+    if (!window.usuarioActual || (!window.usuarioActual.esAdmin && (!id || !edicionProductoDesdePOS))) return;
+    let productoParaFactura = null;
     const codigo = document.getElementById('product-code').value;
     const categoriaId = document.getElementById('product-category').value;
     const nombre = document.getElementById('product-name').value.trim();
@@ -176,8 +184,12 @@ async function handleFormSubmit(event, listaProductos) {
             delete producto.stock;
             delete producto.seguimientoInventario;
         }
+        if (!window.usuarioActual.esAdmin) {
+            delete producto.codigo; delete producto.descripcion; delete producto.imagenes;
+        }
         const respuesta = await apiPost("productos", id ? "update" : "create", producto);
         const guardado = adaptarProducto({ ...anterior, ...producto, ...respuesta });
+        if (creacionProductoDesdePOS) productoParaFactura = guardado;
         if (id) listaProductos[listaProductos.findIndex(p => p.id === id)] = guardado;
         else listaProductos.push(guardado);
         const item = factura.find(p => p.id === id);
@@ -200,6 +212,7 @@ async function handleFormSubmit(event, listaProductos) {
     } finally {
         productosGuardando = false;
         botones.forEach(b => b.disabled = false);
+        if (productoParaFactura && (!productoParaFactura.trackStock || productoParaFactura.stock > 0)) agregarAFactura(productoParaFactura.id, 1);
     }
 }
 

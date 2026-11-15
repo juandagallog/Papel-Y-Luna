@@ -56,7 +56,7 @@ async function renderHistorial(refrescarTrasCarga = false) {
 async function cargarYRenderizarHistorial() {
   const historialContainer = document.querySelector("#historial-container");
   if (!historialContainer) return;
-  const quitarHistorial = mostrarSkeleton(historialContainer, "tarjetas");
+  const quitarHistorial = mostrarSkeleton(historialContainer, "resumen-ventas");
   const quitarAbiertas = mostrarSkeleton(
     document.getElementById("ventas-abiertas-container"),
     "tarjetas"
@@ -120,10 +120,10 @@ async function cargarYRenderizarHistorial() {
   const esUsuarioAdmin = window.usuarioActual && window.usuarioActual.esAdmin;
 
   ventas.forEach(venta => {
-    const card = document.createElement("article");
-    card.classList.add("historial-card");
+    const card = document.createElement("details");
+    card.classList.add("historial-card", "venta-detalle");
 
-    const cardHeader = document.createElement("div");
+    const cardHeader = document.createElement("summary");
     cardHeader.classList.add("historial-card-header");
     const infoHeader = document.createElement("div");
     const idText = document.createElement("strong");
@@ -144,15 +144,13 @@ async function cargarYRenderizarHistorial() {
       const fCorr = venta.fechaCorreccion
         ? new Date(venta.fechaCorreccion).toLocaleString("es-CO")
         : "";
-      badgeCorr.style.display = "block";
-      badgeCorr.style.color = "#b45309";
+      badgeCorr.className = "historial-badge-correccion";
       badgeCorr.textContent = `Corregida por ${venta.corregidaPor || "Admin"} (${fCorr})`;
       infoHeader.appendChild(badgeCorr);
     }
     if (venta.tieneReembolsos) {
       const badgeReemb = document.createElement("small");
-      badgeReemb.style.display = "block";
-      badgeReemb.style.color = "#dc2626";
+      badgeReemb.className = "historial-badge-reembolso";
       badgeReemb.textContent = `Con reembolso (-$${Number(venta.totalReembolsado || 0).toLocaleString("es-CO")})`;
       infoHeader.appendChild(badgeReemb);
     }
@@ -161,6 +159,8 @@ async function cargarYRenderizarHistorial() {
     totalText.textContent = `$${venta.total.toLocaleString("es-CO")}`;
     cardHeader.appendChild(infoHeader);
     cardHeader.appendChild(totalText);
+    const indicacion = document.createElement('span'); indicacion.className = 'detalle-indicacion'; indicacion.textContent = 'Ver detalle';
+    cardHeader.appendChild(indicacion);
 
     const cardBody = document.createElement("div");
     cardBody.classList.add("historial-card-body");
@@ -235,7 +235,16 @@ async function cargarYRenderizarHistorial() {
       btnCorregir.className = "btn-editar";
       btnCorregir.textContent = "Corregir";
       btnCorregir.disabled = !!venta.tieneReembolsos;
-      btnCorregir.addEventListener("click", () => iniciarCorreccionVenta(venta));
+      if (venta.tieneReembolsos) btnCorregir.title = 'No se puede corregir una venta con reembolsos.';
+      btnCorregir.addEventListener("click", async () => {
+        if (factura.length && !await confirmarAccion('Se reemplazará el carrito actual. ¿Continuar?', { titulo: 'Corregir venta', aceptar: 'Continuar' })) return;
+        btnCorregir.disabled = true; btnCorregir.setAttribute('aria-busy', 'true');
+        try {
+          // Leer la versión actual evita reabrir snapshots anteriores a una corrección.
+          iniciarCorreccionVenta(adaptarVentaRemota(await apiGet(`ventas/${venta.id}`)));
+        } catch (error) { mostrarNotificacion(error.message, 'error'); }
+        finally { btnCorregir.disabled = !!venta.tieneReembolsos; btnCorregir.removeAttribute('aria-busy'); }
+      });
 
       const btnReembolsar = document.createElement("button");
       btnReembolsar.type = "button";
@@ -278,12 +287,12 @@ function abrirModalReembolso(venta) {
     const disp = Math.max(0, Number(item.cantidad) - prev);
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${item.nombre}</td>
+      <td>${escaparHTML(item.nombre)}</td>
       <td>${item.cantidad} (Disp: ${disp})</td>
       <td>$${Number(item.precio).toLocaleString("es-CO")}</td>
       <td>
         <input type="number" class="reembolso-cant-input"
-          data-producto-id="${item.productoId}"
+          data-producto-id="${escaparHTML(item.productoId)}"
           data-precio="${item.precio}"
           min="0" max="${disp}" value="0" ${disp === 0 ? "disabled" : ""}>
       </td>
@@ -336,7 +345,7 @@ function imprimirFactura(venta) {
     .map(
       i => `
     <div class="ticket-row">
-      <span>${i.nombre} x${i.cantidad}</span>
+      <span>${escaparHTML(i.nombre)} x${i.cantidad}</span>
       <span>$${Math.round(i.precio * i.cantidad).toLocaleString("es-CO")}</span>
     </div>
   `
@@ -347,14 +356,14 @@ function imprimirFactura(venta) {
     venta.montoDescuento > 0
       ? `
     <div class="ticket-row">
-      <span>Descuento (${venta.descuentoNombre || "Aplicado"}):</span>
+      <span>Descuento (${escaparHTML(venta.descuentoNombre || "Aplicado")}):</span>
       <span>-$${venta.montoDescuento.toLocaleString("es-CO")}</span>
     </div>
   `
       : "";
 
   const bloqueCorregida = venta.corregida
-    ? `<p class="ticket-meta"><strong>[VENTA CORREGIDA POR: ${venta.corregidaPor || "Admin"} — ${new Date(venta.fechaCorreccion).toLocaleString("es-CO")}]</strong></p>`
+    ? `<p class="ticket-meta"><strong>[VENTA CORREGIDA POR: ${escaparHTML(venta.corregidaPor || "Admin")} — ${new Date(venta.fechaCorreccion).toLocaleString("es-CO")}]</strong></p>`
     : "";
 
   const bloqueReembolso = venta.tieneReembolsos
@@ -397,7 +406,7 @@ function imprimirFactura(venta) {
           <h2 class="ticket-title">Papel y Luna</h2>
           <p class="ticket-meta">Referencia: ${referenciaVisible(venta.id, "VTA")}</p>
           <p class="ticket-meta">Fecha: ${new Date(venta.fecha).toLocaleString("es-CO")}</p>
-          <p class="ticket-meta">Cliente: ${nombreCliente(venta.clienteId)}</p>
+          <p class="ticket-meta">Cliente: ${escaparHTML(nombreCliente(venta.clienteId))}</p>
           ${bloqueCorregida}
           ${bloqueReembolso}
           <div class="ticket-divider"></div>
@@ -419,7 +428,7 @@ function imprimirFactura(venta) {
           <div class="ticket-divider"></div>
           <div class="ticket-row">
             <span>Método de Pago:</span>
-            <span>${metodoPago}</span>
+            <span>${escaparHTML(metodoPago)}</span>
           </div>
           ${bloqueEfectivo}
           ${bloqueDeuda}

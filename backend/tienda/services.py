@@ -4,7 +4,8 @@ from datetime import datetime, time
 from django.db import transaction
 from django.db.models import Sum, F
 from django.utils import timezone
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, PermissionDenied
+from .permissions import es_admin
 
 from .models import (
     Producto,
@@ -66,12 +67,13 @@ def normalizar_nombre_faltante(texto):
 
 def calcular_montos_venta(subtotal, tipo_descuento="", valor_descuento=0):
     subtotal = int(round(subtotal))
-    iva = int(round(subtotal * 0.19))
+    # Redondeo a pesos como Math.round del POS, sin errores de coma flotante.
+    iva = (subtotal * 19 + 50) // 100
     total_bruto = subtotal + iva
 
     monto_descuento = 0
     if tipo_descuento == Descuento.TIPO_PORCENTAJE and valor_descuento > 0:
-        monto_descuento = int(round(total_bruto * (valor_descuento / 100.0)))
+        monto_descuento = (total_bruto * valor_descuento + 50) // 100
     elif tipo_descuento == Descuento.TIPO_FIJO and valor_descuento > 0:
         monto_descuento = int(valor_descuento)
 
@@ -90,6 +92,39 @@ def extraer_items_payload(datos):
     if not isinstance(items, list) or len(items) == 0:
         error_negocio("Debes incluir al menos un producto en la operación.")
     return items
+
+
+def resolver_descuento(datos, usuario, venta_existente=None):
+    """Resuelve catálogo o descuento puntual sin crear filas de catálogo."""
+    descuento_id = datos.get("descuentoId") or datos.get("descuento_id") or ""
+    puntual = datos.get("descuentoPersonalizado")
+    if puntual is not None:
+        if (isinstance(puntual, dict) and venta_existente and not venta_existente.descuento_id
+                and puntual.get("tipo") == venta_existente.descuento_tipo_historico
+                and puntual.get("valor") == venta_existente.descuento_valor_historico
+                and not descuento_id):
+            return (None, venta_existente.descuento_nombre_historico,
+                    venta_existente.descuento_tipo_historico, venta_existente.descuento_valor_historico)
+        if not es_admin(usuario):
+            raise PermissionDenied("Solo el administrador puede definir un descuento puntual.")
+        if descuento_id:
+            error_negocio("Solo puede aplicarse un descuento por venta.")
+        if not isinstance(puntual, dict):
+            error_negocio("El descuento puntual debe indicar tipo y valor.")
+        tipo, valor = puntual.get("tipo"), puntual.get("valor")
+        if tipo not in (Descuento.TIPO_FIJO, Descuento.TIPO_PORCENTAJE):
+            error_negocio("Tipo de descuento puntual inválido.")
+        if isinstance(valor, bool) or not isinstance(valor, int) or not 0 < valor <= 9007199254740991:
+            error_negocio("El descuento debe ser un entero positivo representable con precisión en el navegador.")
+        if tipo == Descuento.TIPO_PORCENTAJE and valor > 100:
+            error_negocio("El porcentaje no puede superar el 100%.")
+        return None, "Descuento puntual", tipo, valor
+    if descuento_id:
+        descuento = Descuento.objects.filter(pk=str(descuento_id)).first()
+        if not descuento:
+            error_negocio("El descuento seleccionado no existe.")
+        return descuento, descuento.nombre, descuento.tipo, descuento.valor
+    return None, "", "", 0
 
 
 # =====================================================================
@@ -123,19 +158,7 @@ def guardar_o_cerrar_venta(datos, usuario=None, venta_existente=None):
         error_negocio("Debes seleccionar un cliente para una venta con método Debe.")
 
     # Descuento (máximo 1 por venta)
-    descuento_id = datos.get("descuentoId") or datos.get("descuento_id") or ""
-    descuento_obj = None
-    desc_nombre = ""
-    desc_tipo = ""
-    desc_valor = 0
-
-    if descuento_id:
-        descuento_obj = Descuento.objects.filter(pk=str(descuento_id)).first()
-        if not descuento_obj:
-            error_negocio("El descuento seleccionado no existe.")
-        desc_nombre = descuento_obj.nombre
-        desc_tipo = descuento_obj.tipo
-        desc_valor = descuento_obj.valor
+    descuento_obj, desc_nombre, desc_tipo, desc_valor = resolver_descuento(datos, usuario, venta_existente)
 
     items_raw = extraer_items_payload(datos)
 
@@ -352,21 +375,13 @@ def corregir_venta_cerrada(venta, datos, usuario=None):
             producto.save(update_fields=["stock"])
 
     # Evaluar descuento (conservar el histórico si no se cambia explícitamente)
-    if "descuentoId" in datos or "descuento_id" in datos:
-        descuento_id = datos.get("descuentoId") or datos.get("descuento_id") or ""
-        if descuento_id:
-            desc_obj = Descuento.objects.filter(pk=str(descuento_id)).first()
-            if not desc_obj:
-                error_negocio("El descuento seleccionado no existe.")
-            venta.descuento = desc_obj
-            venta.descuento_nombre_historico = desc_obj.nombre
-            venta.descuento_tipo_historico = desc_obj.tipo
-            venta.descuento_valor_historico = desc_obj.valor
-        else:
-            venta.descuento = None
-            venta.descuento_nombre_historico = ""
-            venta.descuento_tipo_historico = ""
-            venta.descuento_valor_historico = 0
+    if any(campo in datos for campo in ("descuentoId", "descuento_id", "descuentoPersonalizado")):
+        (
+            venta.descuento,
+            venta.descuento_nombre_historico,
+            venta.descuento_tipo_historico,
+            venta.descuento_valor_historico,
+        ) = resolver_descuento(datos, usuario)
 
     # Reconstruir líneas y recalcular totales
     venta.items.all().delete()

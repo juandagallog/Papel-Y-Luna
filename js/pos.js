@@ -2,6 +2,42 @@
 let productos = [];
 let categorias = [];
 let descuentosCatalogo = [];
+let descuentoPuntualActual = null;
+
+function payloadDescuentoFactura() {
+  if (document.getElementById('select-descuento').value === '__puntual__' && descuentoPuntualActual) {
+    if (descuentoPuntualActual.historico && ventaEnCorreccion) return {};
+    return { descuentoId: '', descuentoPersonalizado: { tipo: descuentoPuntualActual.tipo, valor: descuentoPuntualActual.valor } };
+  }
+  const id = document.getElementById('select-descuento').value;
+  return { descuentoId: id === '__puntual__' ? '' : id || '' };
+}
+
+function restaurarDescuentoVenta(venta) {
+  descuentoPuntualActual = null;
+  actualizarSelectDescuentosPOS();
+  if (venta.descuentoId && descuentosCatalogo.some(d => d.id === String(venta.descuentoId))) {
+    document.getElementById('select-descuento').value = String(venta.descuentoId);
+  } else if (Number(venta.descuentoValor) > 0) {
+    descuentoPuntualActual = { tipo: venta.descuentoTipo, valor: Number(venta.descuentoValor), historico: true };
+    actualizarSelectDescuentosPOS();
+    document.getElementById('select-descuento').value = '__puntual__';
+  } else document.getElementById('select-descuento').value = '';
+}
+
+function guardarDescuentoPuntual(event) {
+  event.preventDefault();
+  if (!window.usuarioActual?.esAdmin) return;
+  const tipo = document.getElementById('puntual-tipo').value;
+  const valor = Number(document.getElementById('puntual-valor').value);
+  if (!Number.isSafeInteger(valor) || valor <= 0 || (tipo === 'porcentaje' && valor > 100)) {
+    mostrarNotificacion('Ingresa un valor entero positivo; el porcentaje no puede superar 100%.', 'error'); return;
+  }
+  descuentoPuntualActual = { tipo, valor };
+  actualizarSelectDescuentosPOS(); document.getElementById('select-descuento').value = '__puntual__';
+  calcularTotales(); guardarBorradorVenta(); document.getElementById('puntual-modal').classList.add('hidden');
+  mostrarNotificacion('Descuento aplicado solo a esta factura.', 'exito');
+}
 let catalogoCargado = false;
 let productosGuardando = false;
 
@@ -40,9 +76,11 @@ function actualizarSelectDescuentosPOS() {
         : `${d.nombre} (-$${Number(d.valor).toLocaleString("es-CO")})`;
     select.add(new Option(etiqueta, String(d.id)));
   });
+  if (descuentoPuntualActual) select.add(new Option(`Solo esta venta (${descuentoPuntualActual.tipo === 'porcentaje' ? descuentoPuntualActual.valor + '%' : '$' + descuentoPuntualActual.valor.toLocaleString('es-CO')})`, '__puntual__'));
   if (actual && descuentosCatalogo.some(d => String(d.id) === actual)) {
     select.value = actual;
   }
+  if (actual === '__puntual__' && descuentoPuntualActual) select.value = actual;
 }
 
 async function cargarCatalogoRemoto() {
@@ -153,8 +191,8 @@ function renderizarProductos(listaProductos) {
       fila.innerHTML = `
         <div class="pos-list-info">
           <div class="pos-list-header-group">
-            <span class="product-cat-tag">${producto.categoria}</span>
-            <h4 class="pos-list-title">${producto.nombre}</h4>
+            <span class="product-cat-tag">${escaparHTML(producto.categoria)}</span>
+            <h4 class="pos-list-title">${escaparHTML(producto.nombre)}</h4>
           </div>
           <span class="pos-list-desc">${producto.descripcion || ""}</span>
         </div>
@@ -162,7 +200,7 @@ function renderizarProductos(listaProductos) {
           <span class="pos-list-price">$${producto.precio.toLocaleString("es-CO")}</span>
         </div>
         <div class="pos-list-actions">
-          <input type="number" value="1" min="1" class="cantidad-input pos-list-input" id="cantidad-${producto.id}">
+          <input type="number" value="1" min="1" class="cantidad-input pos-list-input" id="cantidad-${escaparHTML(producto.id)}">
           <button type="button" class="btn-añadir-carrito pos-list-btn">Agregar</button>
         </div>
       `;
@@ -412,7 +450,7 @@ function obtenerDesgloseFacturaActual() {
 
   const selectDesc = document.getElementById("select-descuento");
   const descuentoId = selectDesc ? selectDesc.value : "";
-  const descObj = descuentosCatalogo.find(d => String(d.id) === String(descuentoId));
+  const descObj = descuentoId === '__puntual__' ? descuentoPuntualActual : descuentosCatalogo.find(d => String(d.id) === String(descuentoId));
 
   let montoDescuento = 0;
   if (descObj && totalBruto > 0) {
@@ -496,6 +534,10 @@ const selectDescuento = document.querySelector("#select-descuento");
 
 if (selectDescuento) {
   selectDescuento.addEventListener("change", () => {
+    if (selectDescuento.value !== '__puntual__') {
+      descuentoPuntualActual = null;
+      actualizarSelectDescuentosPOS();
+    }
     calcularTotales();
     guardarBorradorVenta();
   });
@@ -532,6 +574,8 @@ if (inputRecibido) {
 
 // --- MODO CORRECCIÓN DE VENTA CERRADA (Requisito 3.4) ---
 function iniciarCorreccionVenta(venta) {
+  if (!window.usuarioActual?.esAdmin) return;
+  if (venta.tieneReembolsos) { mostrarNotificacion('Esta venta tiene reembolsos y no admite corrección.', 'advertencia'); return; }
   if (
     !catalogoCargado ||
     productosGuardando ||
@@ -562,9 +606,7 @@ function iniciarCorreccionVenta(venta) {
   });
 
   document.getElementById("select-cliente").value = String(venta.clienteId || "");
-  if (selectDescuento) {
-    selectDescuento.value = String(venta.descuentoId || "");
-  }
+  restaurarDescuentoVenta(venta);
   selectPago.value = venta.metodoPago || "Efectivo";
   selectPago.dispatchEvent(new Event("change"));
   inputRecibido.value = venta.metodoPago === "Efectivo" ? venta.recibido : "";
@@ -584,6 +626,7 @@ function cancelarModoCorreccion() {
   factura = [];
   document.getElementById("select-cliente").value = "";
   if (selectDescuento) selectDescuento.value = "";
+  descuentoPuntualActual = null;
   selectPago.value = "Efectivo";
   selectPago.dispatchEvent(new Event("change"));
   inputRecibido.value = "";
@@ -652,13 +695,13 @@ if (botonFinalizar) {
         await apiCorregirVenta(ventaEnCorreccion.id, {
           clienteId,
           metodoPago,
-          descuentoId,
+          ...payloadDescuentoFactura(),
           valorRecibido: recibido,
           items: itemsVenta,
         });
         cancelarModoCorreccion();
         await cargarCatalogoRemoto();
-        renderHistorial(true);
+        await renderHistorial(true);
         mostrarNotificacion(
           "Venta corregida e inventario ajustado correctamente.",
           "exito"
@@ -679,7 +722,7 @@ if (botonFinalizar) {
       fecha: ventaAbiertaActualFecha || ahora,
       estado: "cerrada",
       clienteId,
-      descuentoId,
+      ...payloadDescuentoFactura(),
       metodoPago,
       subtotal,
       total,
@@ -705,6 +748,7 @@ if (botonFinalizar) {
       eliminarBorradorVenta();
       document.getElementById("select-cliente").value = "";
       if (selectDescuento) selectDescuento.value = "";
+      descuentoPuntualActual = null;
       document.getElementById("venta-abierta-estado").textContent = "";
       botonFinalizar.textContent = "Finalizar Venta";
       factura = [];

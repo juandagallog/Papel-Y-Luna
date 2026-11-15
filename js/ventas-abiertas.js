@@ -55,7 +55,7 @@ async function guardarVentaAbierta() {
     actualizadoEn: ahora,
     estado: "abierta",
     clienteId,
-    descuentoId,
+    ...payloadDescuentoFactura(),
     metodoPago,
     subtotal,
     total,
@@ -83,6 +83,7 @@ async function guardarVentaAbierta() {
     document.getElementById("select-cliente").value = "";
     const selDesc = document.getElementById("select-descuento");
     if (selDesc) selDesc.value = "";
+    descuentoPuntualActual = null;
     document.getElementById("venta-abierta-estado").textContent = "";
     selectPago.value = "Efectivo";
     inputRecibido.value = "";
@@ -120,7 +121,7 @@ async function retomarVentaAbierta(id) {
   }
   if (
     factura.length &&
-    !window.confirm("¿Reemplazar el carrito actual por esta venta abierta?")
+    !await confirmarAccion("¿Reemplazar el carrito actual por esta venta abierta?", { titulo: 'Retomar venta', aceptar: 'Reemplazar carrito' })
   )
     return;
   productosGuardando = true;
@@ -152,8 +153,7 @@ async function retomarVentaAbierta(id) {
       select.add(new Option(nombreCliente(clienteId), clienteId));
     }
     select.value = clienteId;
-    const selDesc = document.getElementById("select-descuento");
-    if (selDesc) selDesc.value = String(venta.descuentoId || "");
+    restaurarDescuentoVenta(venta);
     selectPago.value = venta.metodoPago;
     selectPago.dispatchEvent(new Event("change"));
     inputRecibido.value = adaptada.recibido;

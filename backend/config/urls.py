@@ -33,4 +33,5 @@ urlpatterns = [
     re_path(r"^css/(?P<path>.*)$", serve, {"document_root": PROJECT_ROOT / "css"}),
     re_path(r"^js/(?P<path>.*)$", serve, {"document_root": PROJECT_ROOT / "js"}),
     re_path(r"^imagenes/(?P<path>.*)$", serve, {"document_root": PROJECT_ROOT / "imagenes"}),
+    re_path(r"^assets/fonts/(?P<path>.*)$", serve, {"document_root": PROJECT_ROOT / "assets" / "fonts"}),
 ]

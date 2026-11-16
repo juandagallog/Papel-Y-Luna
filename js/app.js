@@ -22,6 +22,7 @@ function aplicarPermisosInterfaz(user) {
       : "Sin sesión";
   }
 
+  document.body.dataset.rol = user?.esAdmin ? 'admin' : 'cajero';
   const esAdmin = Boolean(user && user.esAdmin);
   document.querySelectorAll(".admin-only").forEach(el => {
     if (esAdmin) el.classList.remove("hidden");
@@ -36,13 +37,14 @@ async function inicializarDatosSistema() {
     cargarGestion("proveedores").catch(() => {}),
   ]);
   actualizarSelectoresFaltantes();
+  document.getElementById('btn-nav-inicio').click();
 }
 
 // =====================================================================
 // GESTIÓN DE DESCUENTOS (Requisito 3.6 - Solo Admin)
 // =====================================================================
 async function cargarVistaDescuentos() {
-  const quitar = mostrarSkeleton(document.getElementById('descuentos-body'), 'tabla', 4);
+  const quitar = mostrarSkeleton(document.getElementById('descuentos-body'), 'tabla', 5);
   try {
     const lista = await apiGet("descuentos");
     descuentosCatalogo = Array.isArray(lista)
@@ -51,6 +53,7 @@ async function cargarVistaDescuentos() {
           nombre: String(d.nombre),
           tipo: String(d.tipo),
           valor: Number(d.valor),
+          disponible: d.disponible !== false,
         }))
       : [];
     actualizarSelectDescuentosPOS();
@@ -64,7 +67,9 @@ function renderTablaDescuentos() {
   const tbody = document.getElementById("descuentos-body");
   if (!tbody) return;
   tbody.replaceChildren();
-  descuentosCatalogo.forEach(d => {
+  tbody.closest('table').classList.add('tabla-fichas');
+  const q = document.getElementById('descuentos-buscar').value.trim().toLowerCase(), estado = document.getElementById('descuentos-filtro').value;
+  paginarListado('descuentos', descuentosCatalogo.filter(d => d.nombre.toLowerCase().includes(q) && (!estado || String(d.disponible) === estado)), JSON.stringify([q,estado]), tbody.closest('.table-responsive'), renderTablaDescuentos).forEach(d => {
     const tr = document.createElement("tr");
     const valorTexto =
       d.tipo === "porcentaje"
@@ -74,6 +79,7 @@ function renderTablaDescuentos() {
       <td>${escaparHTML(d.nombre)}</td>
       <td>${d.tipo === "porcentaje" ? "Porcentaje" : "Valor fijo"}</td>
       <td>${valorTexto}</td>
+      <td><span class="estado-badge ${d.disponible ? 'estado-disponible' : 'estado-agotado'}">${d.disponible ? 'Disponible' : 'No disponible'}</span></td>
       <td>
         <button type="button" class="btn-editar" data-id="${escaparHTML(d.id)}">Editar</button>
         <button type="button" class="btn-eliminar" data-id="${escaparHTML(d.id)}">Eliminar</button>
@@ -84,6 +90,8 @@ function renderTablaDescuentos() {
       document.getElementById("descuentos-nombre").value = d.nombre;
       document.getElementById("descuentos-tipo").value = d.tipo;
       document.getElementById("descuentos-valor").value = d.valor;
+      document.getElementById('descuentos-disponible').value = String(d.disponible);
+      abrirFormularioModal('descuentos-form', 'Editar descuento');
     });
     tr.querySelector(".btn-eliminar").addEventListener("click", async () => {
       if (!await confirmarAccion(`¿Eliminar el descuento "${d.nombre}"?`, { titulo: 'Eliminar descuento', aceptar: 'Eliminar', peligrosa: true })) return;
@@ -97,6 +105,7 @@ function renderTablaDescuentos() {
       }
     });
     tbody.appendChild(tr);
+    [...tr.cells].forEach((td,i) => td.dataset.label=['Nombre','Tipo','Valor','Estado','Acciones'][i]);
   });
 }
 
@@ -116,13 +125,14 @@ async function guardarDescuento(event) {
   form.setAttribute('aria-busy', 'true');
   form.querySelectorAll('button').forEach(b => b.disabled = true);
   try {
-    const payload = { id: id || crypto.randomUUID(), nombre, tipo, valor };
+    const payload = { id: id || crypto.randomUUID(), nombre, tipo, valor, disponible: document.getElementById('descuentos-disponible').value === 'true' };
     await apiPost("descuentos", id ? "update" : "create", payload);
     document.getElementById("descuentos-form").reset();
     document.getElementById("descuentos-id").value = "";
     await cargarVistaDescuentos();
     calcularTotales();
     mostrarNotificacion("Descuento guardado correctamente.", "exito");
+    form.removeAttribute('aria-busy'); cerrarFormularioModal('descuentos-form');
   } catch (error) {
     mostrarNotificacion(error.message, "error");
   } finally { form.removeAttribute('aria-busy'); form.querySelectorAll('button').forEach(b => b.disabled = false); }
@@ -160,77 +170,41 @@ function actualizarSelectoresFaltantes() {
 }
 
 let secuenciaFaltantes = 0;
+let faltantesActuales = [];
 async function cargarFaltantes() {
   const secuencia = ++secuenciaFaltantes;
-  const quitarAgrupados = mostrarSkeleton(document.getElementById('faltantes-agrupados-body'), 'tabla', 5);
-  const quitarLista = mostrarSkeleton(document.getElementById('faltantes-table-body'), 'tabla', 7);
+  const quitar = mostrarSkeleton(document.getElementById('faltantes-table-body'), 'tabla', 7);
   actualizarSelectoresFaltantes();
-  const tipo = document.getElementById("filtro-faltante-tipo").value;
-  const proveedorId = document.getElementById("filtro-faltante-proveedor").value;
-
   try {
-    const [lista, agrupados] = await Promise.all([
-      apiGet("faltantes", { tipo, proveedorId }),
-      apiGet("faltantes/agrupados", { tipo, proveedorId }),
-    ]);
+    const lista = await apiGet('faltantes');
     if (secuencia !== secuenciaFaltantes) return;
-
-    const bodyAgrupados = document.getElementById("faltantes-agrupados-body");
-    bodyAgrupados.replaceChildren();
-    agrupados.forEach(g => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td><strong title="Agrupado como: ${escaparHTML(g.nombreNormalizado)}">${escaparHTML(g.descripcionReferencia)}</strong></td>
-        <td>${g.tipo === 'agotado' ? 'Agotado' : 'No registrado'}</td>
-        <td>${escaparHTML(g.proveedorNombre)}</td>
-        <td>${g.numeroSolicitudes}</td>
-        <td><strong>${g.cantidadTotalSolicitada} un.</strong></td>
-      `;
-      tr.querySelectorAll('td').forEach((td, i) => td.dataset.label = ['Producto', 'Tipo', 'Proveedor', 'Solicitudes', 'Cantidad total'][i]);
-      bodyAgrupados.appendChild(tr);
-    });
-
-    const bodyLista = document.getElementById("faltantes-table-body");
-    bodyLista.replaceChildren();
-    lista.forEach(f => {
-      const tr = document.createElement("tr");
-      const fecha = new Date(f.fecha).toLocaleString("es-CO");
-      tr.innerHTML = `
-        <td>${fecha}</td>
-        <td>${escaparHTML(f.productoNombre || f.descripcion)}</td>
-        <td>${escaparHTML(f.tipo)}</td>
-        <td>${f.cantidadSolicitada}</td>
-        <td>${escaparHTML(f.proveedorNombre)}</td>
-        <td><strong>${escaparHTML(f.estado)}</strong></td>
-        <td></td>
-      `;
-      tr.querySelectorAll('td').forEach((td, i) => td.dataset.label = ['Fecha', 'Producto', 'Tipo', 'Cantidad', 'Proveedor', 'Estado', 'Acción'][i]);
-      const tdAccion = tr.lastElementChild;
-      if (f.estado === "pendiente") {
-        const btnResolver = document.createElement("button");
-        btnResolver.type = "button";
-        btnResolver.className = "btn-primary";
-        btnResolver.textContent = "Marcar resuelto";
-        btnResolver.addEventListener("click", async () => {
-          if (btnResolver.disabled) return;
-          btnResolver.disabled = true; btnResolver.setAttribute('aria-busy', 'true');
-          try {
-            await apiPost("faltantes", "update", { id: f.id, estado: "resuelto" });
-            await cargarFaltantes();
-            mostrarNotificacion("Faltante marcado como resuelto.", "exito");
-          } catch (error) {
-            mostrarNotificacion(error.message, "error");
-          } finally { btnResolver.disabled = false; btnResolver.removeAttribute('aria-busy'); }
-        });
-        tdAccion.appendChild(btnResolver);
-      }
-      bodyLista.appendChild(tr);
-    });
-  } catch (error) {
-    if (secuencia === secuenciaFaltantes) mostrarNotificacion(error.message, "error");
-  } finally { quitarAgrupados(); quitarLista(); }
+    faltantesActuales = lista;
+    renderFaltantes();
+  } catch (error) { if (secuencia === secuenciaFaltantes) mostrarNotificacion(error.message, 'error'); }
+  finally { quitar(); }
 }
-
+function renderFaltantes() {
+  const q=document.getElementById('faltantes-buscar').value.trim().toLowerCase();
+  const tipo=document.getElementById('filtro-faltante-tipo').value, proveedor=document.getElementById('filtro-faltante-proveedor').value, estado=document.getElementById('faltantes-estado').value;
+  const body=document.getElementById('faltantes-table-body'); body.replaceChildren(); body.closest('table').classList.add('tabla-fichas');
+  const lista=faltantesActuales.filter(f=>(!q || [f.productoNombre,f.descripcion].some(t=>String(t||'').toLowerCase().includes(q))) && (!tipo || f.tipo===tipo) && (!proveedor || String(f.proveedorId)===proveedor) && (!estado || f.estado===estado));
+  paginarListado('faltantes',lista,JSON.stringify([q,tipo,proveedor,estado]),body.closest('.table-responsive'),renderFaltantes).forEach(f=>{
+    const tr=body.insertRow(); celdaVista(tr,f.productoNombre||f.descripcion);
+    tr.insertCell().append(insigniaEstado(f.tipo==='agotado'?'agotado':'neutro',f.tipo==='agotado'?'Agotado':'Inexistente'));
+    celdaVista(tr,f.cantidadSolicitada);celdaVista(tr,f.proveedorNombre||'—');
+    tr.insertCell().append(insigniaEstado(f.estado==='resuelto'?'disponible':'bajo',f.estado==='resuelto'?'Resuelto':'Pendiente'));
+    celdaVista(tr,fechaVista(f.fecha));filaConDetalle(tr,()=>abrirDetalleFaltante(f));
+    [...tr.cells].forEach((td,i)=>td.dataset.label=['Producto','Tipo','Cantidad','Proveedor','Estado','Fecha','Detalle'][i]);
+  });
+  if(!lista.length){const td=body.insertRow().insertCell();td.colSpan=7;td.textContent='No hay faltantes que coincidan con los filtros.';}
+}
+function abrirDetalleFaltante(f) {
+  const acciones=f.estado==='pendiente'?[{texto:'Marcar como resuelto',ejecutar:async()=>{
+    try {await apiPost('faltantes','update',{id:f.id,estado:'resuelto'});await cargarFaltantes();mostrarNotificacion('Faltante resuelto.','exito');}
+    catch(error){mostrarNotificacion(error.message,'error');}
+  }}]:[];
+  abrirFicha(f.productoNombre||f.descripcion,[datosFicha([['Tipo',f.tipo==='agotado'?'Agotado':'Inexistente'],['Cantidad solicitada',f.cantidadSolicitada],['Proveedor',f.proveedorNombre],['Fecha',fechaVista(f.fecha)],['Estado',f.estado==='resuelto'?'Resuelto':'Pendiente'],['Notas',f.notas]])],acciones);
+}
 async function registrarFaltante(event) {
   event.preventDefault();
   const form = document.getElementById('faltante-form');
@@ -262,10 +236,12 @@ async function registrarFaltante(event) {
       descripcion,
       cantidadSolicitada,
       proveedorId: proveedorId || null,
+      notas: document.getElementById("faltante-notas").value.trim(),
     });
     document.getElementById("faltante-form").reset();
     document.getElementById('faltante-tipo').dispatchEvent(new Event('change'));
     await cargarFaltantes();
+    form.removeAttribute('aria-busy'); cerrarFormularioModal('faltante-form');
     mostrarNotificacion("Faltante registrado correctamente.", "exito");
   } catch (error) {
     mostrarNotificacion(error.message, "error");
@@ -277,12 +253,17 @@ async function registrarFaltante(event) {
 // =====================================================================
 async function consultarReportes(event) {
   if (event) event.preventDefault();
+  if (!window.usuarioActual?.esAdmin) return;
+  const usuarioReporte = window.usuarioActual;
+  const boton = document.querySelector('#reportes-form button[type="submit"]');
+  if (boton.disabled) return;
   const inputIni = document.getElementById("reporte-fecha-inicio");
   const inputFin = document.getElementById("reporte-fecha-fin");
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = fechaNegocio();
   if (!inputIni.value) inputIni.value = hoy;
   if (!inputFin.value) inputFin.value = hoy;
 
+  boton.disabled = true;
   const quitar = mostrarSkeleton(document.getElementById('reportes-resumen-cards'), 'tarjetas');
   try {
     const data = await apiGet("reportes", {
@@ -290,19 +271,8 @@ async function consultarReportes(event) {
       fechaFin: inputFin.value,
     });
 
-    const cards = document.getElementById("reportes-resumen-cards");
-    cards.innerHTML = `
-      <article class="historial-card">
-        <strong>Ventas Cerradas (${data.rango.fechaInicio} a ${data.rango.fechaFin}):</strong> ${data.ventasTotales.cantidadVentas}<br>
-        <strong>Total Facturado:</strong> $${Number(data.ventasTotales.totalFacturado).toLocaleString("es-CO")}<br>
-        <strong>Reembolsos:</strong> -$${Number(data.ventasTotales.totalReembolsado).toLocaleString("es-CO")}<br>
-        <strong>Ventas Netas:</strong> $${Number(data.ventasTotales.ventasNetas).toLocaleString("es-CO")}
-      </article>
-      <article class="historial-card">
-        <strong>Compras Registradas:</strong> ${data.comprasRegistradas.cantidadCompras}<br>
-        <strong>Monto Total Compras:</strong> $${Number(data.comprasRegistradas.montoTotalCompras).toLocaleString("es-CO")}
-      </article>
-    `;
+    if (window.usuarioActual !== usuarioReporte) return;
+    renderResumenReporte(data);
 
     const bodyVendidos = document.getElementById("reporte-mas-vendidos-body");
     bodyVendidos.replaceChildren();
@@ -341,9 +311,10 @@ async function consultarReportes(event) {
       `;
       bodyFaltantes.appendChild(tr);
     });
+    completarTablasReporte();
   } catch (error) {
     mostrarNotificacion(error.message, "error");
-  } finally { quitar(); }
+  } finally { quitar(); boton.disabled = false; }
 }
 
 // =====================================================================
@@ -487,8 +458,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.getElementById("faltante-form").addEventListener("submit", registrarFaltante);
   document.getElementById("btn-recargar-faltantes").addEventListener("click", cargarFaltantes);
-  document.getElementById("filtro-faltante-tipo").addEventListener("change", cargarFaltantes);
-  document.getElementById("filtro-faltante-proveedor").addEventListener("change", cargarFaltantes);
+  document.getElementById("filtro-faltante-tipo").addEventListener("change", renderFaltantes);
+  document.getElementById("filtro-faltante-proveedor").addEventListener("change", renderFaltantes);
 
   document.getElementById("reportes-form").addEventListener("submit", consultarReportes);
 
@@ -541,10 +512,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     "categorias",
     "descuentos",
     "faltantes",
+    "inicio",
     "reportes",
   ];
 
   function mostrarVista(nombreVista) {
+    if (['proveedores','compras','categorias','descuentos','reportes'].includes(nombreVista) && !window.usuarioActual?.esAdmin) return;
     todasLasVistas.forEach(v => {
       const sec = document.getElementById(`vista-${v}`);
       const btn = document.getElementById(`btn-nav-${v}`);
@@ -555,6 +528,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const activoBtn = document.getElementById(`btn-nav-${nombreVista}`);
     if (activaSec) activaSec.classList.remove("vista-oculta");
     if (activoBtn) activoBtn.classList.add("active");
+    if (nombreVista === 'reportes') document.getElementById('btn-nav-inicio').classList.add('active');
   }
 
   document.getElementById("btn-nav-pos").addEventListener("click", () => mostrarVista("pos"));
@@ -592,10 +566,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     mostrarVista("faltantes");
     cargarFaltantes();
   });
-  document.getElementById("btn-nav-reportes").addEventListener("click", () => {
-    mostrarVista("reportes");
+  document.getElementById("btn-nav-inicio").addEventListener("click", () => {
+    mostrarVista("inicio");
+    cargarInicio();
+  });
+  document.getElementById('inicio-reportes').addEventListener('click', () => {
+    if (!window.usuarioActual?.esAdmin) return;
+    mostrarVista('reportes');
     consultarReportes();
   });
+  document.getElementById('reportes-volver').addEventListener('click', () => document.getElementById('btn-nav-inicio').click());
 
   // Eventos para Modales y CRUD de Productos
   document.querySelector("#btn-new-product").addEventListener("click", () => {

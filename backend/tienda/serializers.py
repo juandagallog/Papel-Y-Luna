@@ -40,7 +40,7 @@ class ProveedorSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Proveedor
-        fields = ["id", "nombre", "telefono", "correo"]
+        fields = ["id", "nombre", "tipo", "documento", "telefono", "correo", "direccion"]
 
     def validate_nombre(self, value):
         nombre = value.strip()
@@ -54,7 +54,7 @@ class ClienteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Cliente
-        fields = ["id", "nombre", "telefono", "correo"]
+        fields = ["id", "nombre", "tipo", "documento", "telefono", "correo", "direccion"]
 
     def validate_nombre(self, value):
         nombre = value.strip()
@@ -136,7 +136,7 @@ class DescuentoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Descuento
-        fields = ["id", "nombre", "tipo", "valor"]
+        fields = ["id", "nombre", "tipo", "valor", "disponible"]
 
     def validate_nombre(self, value):
         nombre = value.strip()
@@ -316,6 +316,7 @@ class FaltanteSerializer(serializers.ModelSerializer):
             "productoNombre",
             "descripcion",
             "nombreNormalizado",
+            "notas",
             "cantidadSolicitada",
             "fecha",
             "tipo",

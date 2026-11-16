@@ -1,6 +1,6 @@
 // Patrón compartido solo para los dos CRUD nuevos; Clientes conserva su flujo actual.
 const gestiones = {
-  proveedores: { campos: ['nombre', 'telefono', 'correo'], registros: [], guardando: false, cargando: null },
+  proveedores: { campos: ['nombre', 'telefono', 'correo', 'tipo', 'documento', 'direccion'], registros: [], guardando: false, cargando: null },
   categorias: { campos: ['nombre'], registros: [], guardando: false, cargando: null }
 };
 
@@ -28,9 +28,22 @@ function sincronizarGestion(resource) {
 function renderGestion(resource) {
   const gestion = gestiones[resource];
   const body = document.getElementById(`${resource}-body`);
+  body.closest('table').classList.add('tabla-fichas');
   const texto = document.getElementById(`${resource}-buscar`).value.toLowerCase().trim();
   body.replaceChildren();
-  gestion.registros.filter(r => gestion.campos.some(c => r[c].toLowerCase().includes(texto))).forEach(r => {
+  if (resource === 'proveedores') {
+    body.closest('table').classList.add('tabla-fichas');
+    paginarListado(resource, gestion.registros.filter(r => [r.nombre,r.telefono,r.correo,r.documento].some(v => v.toLowerCase().includes(texto))), texto, body.closest('.table-responsive'), () => renderGestion(resource)).forEach(r => {
+      const tr=document.createElement('tr'); const nombre=celdaVista(tr,r.nombre);
+      nombre.append(document.createElement('br'),insigniaEstado('neutro',r.tipo==='persona'?'Persona':'Empresa'));
+      celdaVista(tr,r.documento); celdaVista(tr,[r.telefono || '—',r.correo || '—'].join(' · '));
+      filaConDetalle(tr,()=>fichaContacto(r,'proveedor'));
+      [...tr.cells].forEach((td,i)=>td.dataset.label=['Proveedor','Documento / NIT','Contacto',''][i]); body.append(tr);
+    });
+    if(!body.rows.length) {const td=body.insertRow().insertCell();td.colSpan=4;td.className='tabla-vacia';td.textContent='No hay proveedores que coincidan con la búsqueda.';}
+    return;
+  }
+  paginarListado(resource, gestion.registros.filter(r => gestion.campos.some(c => r[c].toLowerCase().includes(texto))), texto, body.closest('.table-responsive'), () => renderGestion(resource)).forEach(r => {
     const tr = document.createElement('tr');
     const referencia = document.createElement('td');
     referencia.className = 'referencia-registro';
@@ -46,7 +59,7 @@ function renderGestion(resource) {
       const actual = gestion.registros.find(registro => registro.id === r.id);
       if (!actual) return;
       ['id', ...gestion.campos].forEach(c => document.getElementById(`${resource}-${c}`).value = actual[c]);
-      if (resource === 'proveedores') abrirFormularioModal('proveedores-form', 'Editar proveedor');
+      abrirFormularioModal(`${resource}-form`, resource === 'proveedores' ? 'Editar proveedor' : 'Editar categoría');
       const nombre = document.getElementById(`${resource}-nombre`);
       nombre.scrollIntoView({ block: 'center' });
       nombre.focus({ preventScroll: true });
@@ -54,12 +67,13 @@ function renderGestion(resource) {
     const eliminar = document.createElement('button'); eliminar.type = 'button'; eliminar.className = 'btn-eliminar'; eliminar.textContent = 'Eliminar'; eliminar.disabled = gestion.guardando;
     eliminar.addEventListener('click', () => eliminarGestion(resource, r));
     td.append(editar, eliminar); tr.appendChild(td); body.appendChild(tr);
+    [...tr.cells].forEach((celda,i)=>celda.dataset.label=['Referencia','Nombre','Acciones'][i]);
   });
 }
 
 function bloquearGestion(resource, valor) {
   gestiones[resource].guardando = valor;
-  document.querySelectorAll(`#vista-${resource} button, #${resource}-form input, #${resource}-form button`).forEach(e => e.disabled = valor);
+  document.querySelectorAll(`#vista-${resource} button, #${resource}-form input, #${resource}-form select, #${resource}-form button`).forEach(e => e.disabled = valor);
   indicarFormularioOcupado(`${resource}-form`, valor);
   document.getElementById(`${resource}-estado`).textContent = valor ? 'Guardando cambios...' : '';
   renderGestion(resource);
@@ -71,7 +85,7 @@ async function cargarGestion(resource) {
   if (gestion.guardando) return;
   const estado = document.getElementById(`${resource}-estado`);
   estado.textContent = '';
-  const quitarSkeleton = mostrarSkeleton(document.getElementById(`${resource}-body`), 'tabla', gestion.campos.length + 2);
+  const quitarSkeleton = mostrarSkeleton(document.getElementById(`${resource}-body`), 'tabla', resource === 'proveedores' ? 4 : gestion.campos.length + 2);
   gestion.cargando = (async () => {
     try {
       const datos = await apiGet(resource);
@@ -99,7 +113,7 @@ async function guardarGestion(resource, event, desdeCompra = false) {
   idInput.value = idInput.value || crypto.randomUUID();
   datos.id = idInput.value;
   bloquearGestion(resource, true);
-  if (desdeCompra) document.querySelectorAll('#nuevo-proveedor-modal button, #nuevo-proveedor-form input').forEach(e => e.disabled = true);
+  if (desdeCompra) document.querySelectorAll('#nuevo-proveedor-modal button, #nuevo-proveedor-form input, #nuevo-proveedor-form select').forEach(e => e.disabled = true);
   try {
     let respuesta;
     try { respuesta = await apiPost(resource, existente ? 'update' : 'create', datos); }
@@ -113,9 +127,9 @@ async function guardarGestion(resource, event, desdeCompra = false) {
     if (index < 0) gestion.registros.push(guardado); else gestion.registros[index] = guardado;
     document.getElementById(desdeCompra ? 'nuevo-proveedor-form' : `${resource}-form`).reset(); idInput.value = '';
     sincronizarGestion(resource);
-    if (!desdeCompra && resource === 'proveedores') {
-      indicarFormularioOcupado('proveedores-form', false);
-      cerrarFormularioModal('proveedores-form');
+    if (!desdeCompra) {
+      indicarFormularioOcupado(`${resource}-form`, false);
+      cerrarFormularioModal(`${resource}-form`);
     }
     if (desdeCompra) {
       document.getElementById('compra-proveedor').value = guardado.id;
@@ -161,4 +175,10 @@ async function eliminarGestion(resource, registro) {
     mostrarNotificacion('Registro eliminado.', 'exito');
   } catch (error) { mostrarNotificacion(error.message, 'error'); }
   finally { bloquearGestion(resource, false); }
+}
+
+function editarProveedor(registro) {
+  if (gestiones.proveedores.guardando || gestiones.proveedores.cargando) return;
+  ['id', ...gestiones.proveedores.campos].forEach(c => document.getElementById('proveedores-'+c).value = registro[c] ?? '');
+  abrirFormularioModal('proveedores-form', 'Editar proveedor');
 }

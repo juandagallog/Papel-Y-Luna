@@ -14,6 +14,7 @@ function actualizarProductosCompra() {
 function renderLineasCompra() {
   const body = document.getElementById("compra-items");
   if (!body) return;
+  body.closest('table').classList.add('tabla-fichas');
   body.replaceChildren();
   if (!lineasCompra.length) {
     const fila = document.createElement("tr");
@@ -50,6 +51,7 @@ function renderLineasCompra() {
     td.appendChild(boton);
     tr.appendChild(td);
     body.appendChild(tr);
+    [...tr.cells].forEach((td,i)=>td.dataset.label=['Producto','Cantidad','Costo','Subtotal','Acciones'][i]);
   });
   document.getElementById("compra-total").textContent = `$${Math.round(
     lineasCompra.reduce((sum, i) => sum + i.costo * i.cantidad, 0)
@@ -137,6 +139,7 @@ async function registrarCompra(event) {
 
   const boton = document.getElementById("btn-registrar-compra");
   productosGuardando = true;
+  document.getElementById("compra-form").setAttribute("aria-busy","true");
   document
     .querySelectorAll("#compra-form input, #compra-form select, #compra-form button")
     .forEach(e => (e.disabled = true));
@@ -151,6 +154,7 @@ async function registrarCompra(event) {
     await cargarCatalogoRemoto();
     document.getElementById("compra-estado").textContent =
       "Compra e inventario confirmados.";
+    document.getElementById("compra-form").removeAttribute("aria-busy"); cerrarFormularioModal("compra-form");
     mostrarNotificacion("Compra registrada correctamente.", "exito");
     cargarCompras(true);
   } catch (error) {
@@ -159,6 +163,7 @@ async function registrarCompra(event) {
     mostrarNotificacion(error.message, "error");
   } finally {
     productosGuardando = false;
+    document.getElementById("compra-form").removeAttribute("aria-busy");
     document
       .querySelectorAll("#compra-form input, #compra-form select, #compra-form button")
       .forEach(e => (e.disabled = false));
@@ -185,100 +190,8 @@ async function cargarCompras(refrescarTrasCarga = false) {
         ...c,
         total: Math.round(Number(c.total) || 0),
       }));
-      const fragment = document.createDocumentFragment();
-      if (!compras.length) {
-        const p = document.createElement("p");
-        p.textContent = "No hay compras registradas.";
-        fragment.appendChild(p);
-      }
-      compras.forEach(compra => {
-        const items =
-          typeof compra.itemsJson === "string"
-            ? JSON.parse(compra.itemsJson)
-            : compra.items || compra.itemsJson || [];
-        const card = document.createElement("details");
-        card.className = "historial-card compra-detalle";
-        const summary = document.createElement("summary");
-        const proveedor = gestiones.proveedores.registros.find(
-          p => p.id === String(compra.proveedorId)
-        );
-        const titulo = document.createElement("strong");
-        titulo.textContent = referenciaVisible(compra.id, "CMP");
-        const importe = document.createElement("strong");
-        importe.textContent = `$${Math.round(Number(compra.total)).toLocaleString("es-CO")}`;
-        const accion = document.createElement("span");
-        accion.className = "detalle-indicacion";
-        accion.textContent = "Ver detalle";
-        summary.append(titulo, importe, accion);
-        card.appendChild(summary);
-
-        const informacion = document.createElement("dl");
-        informacion.className = "compra-datos";
-        const fecha = new Date(compra.fecha);
-        const datos = [
-          [
-            "Proveedor",
-            compra.proveedorNombre ||
-              proveedor?.nombre ||
-              "Proveedor no disponible",
-          ],
-          [
-            "Fecha",
-            Number.isNaN(fecha.getTime())
-              ? compra.fecha
-              : fecha.toLocaleString("es-CO"),
-          ],
-          [
-            "Ítems comprados",
-            items.map(i => `${i.nombre} (×${i.cantidad})`).join(", "),
-          ],
-        ];
-        datos.forEach(([etiqueta, valor]) => {
-          const grupo = document.createElement("div");
-          const dt = document.createElement("dt");
-          const dd = document.createElement("dd");
-          dt.textContent = etiqueta;
-          dd.textContent = valor;
-          grupo.append(dt, dd);
-          informacion.appendChild(grupo);
-        });
-        summary.appendChild(informacion);
-
-        const tabla = document.createElement("table");
-        tabla.className = "crud-table";
-        const thead = document.createElement("thead");
-        const encabezado = document.createElement("tr");
-        ["Producto", "Cantidad", "Costo unitario", "Subtotal"].forEach(texto => {
-          const th = document.createElement("th");
-          th.textContent = texto;
-          th.scope = "col";
-          encabezado.appendChild(th);
-        });
-        thead.appendChild(encabezado);
-        tabla.appendChild(thead);
-        const tbody = document.createElement("tbody");
-        items.forEach(i => {
-          const tr = document.createElement("tr");
-          [
-            i.nombre,
-            i.cantidad,
-            `$${Math.round(Number(i.costo)).toLocaleString("es-CO")}`,
-            `$${Math.round(Number(i.costo) * Number(i.cantidad)).toLocaleString("es-CO")}`,
-          ].forEach(valor => {
-            const td = document.createElement("td");
-            td.textContent = valor;
-            tr.appendChild(td);
-          });
-          tbody.appendChild(tr);
-        });
-        tabla.appendChild(tbody);
-        const responsive = document.createElement("div");
-        responsive.className = "table-responsive";
-        responsive.appendChild(tabla);
-        card.appendChild(responsive);
-        fragment.appendChild(card);
-      });
-      document.getElementById("compras-lista").replaceChildren(fragment);
+      comprasRegistradas=compras;
+      renderListaCompras();
       estado.textContent = "";
     } catch (error) {
       estado.textContent = "No se pudieron cargar las compras.";
@@ -291,4 +204,27 @@ async function cargarCompras(refrescarTrasCarga = false) {
     quitarSkeleton();
     comprasEnCarga = null;
   }
+}
+let comprasRegistradas = [];
+function renderListaCompras() {
+  const q=document.getElementById('compras-buscar').value.trim().toLowerCase();
+  const desde=document.getElementById('compras-fecha-desde').value, hasta=document.getElementById('compras-fecha-hasta').value;
+  const tabla=tablaVista(['Compra','Fecha','Proveedor','Total','Detalle']);
+  const lista=comprasRegistradas.filter(c=>(!desde || fechaLocal(c.fecha)>=desde) && (!hasta || fechaLocal(c.fecha)<=hasta) && (!q || [referenciaVisible(c.id,'CMP'),c.proveedorNombre || gestiones.proveedores.registros.find(p=>p.id===String(c.proveedorId))?.nombre || ''].some(t=>t.toLowerCase().includes(q))));
+  paginarListado('compras', lista, JSON.stringify([q,desde,hasta]), document.getElementById('compras-lista'), renderListaCompras).forEach(c=>{
+    const fila=tabla.tBodies[0].insertRow(); fila.dataset.compraId=c.id;
+    celdaVista(fila,referenciaVisible(c.id,'CMP'));celdaVista(fila,fechaVista(c.fecha));
+    celdaVista(fila,c.proveedorNombre || gestiones.proveedores.registros.find(p=>p.id===String(c.proveedorId))?.nombre);
+    celdaVista(fila,dineroVista(c.total));filaConDetalle(fila,()=>abrirFichaCompra(c));
+  });
+  if(!lista.length){const td=tabla.tBodies[0].insertRow().insertCell();td.colSpan=5;td.className='tabla-vacia';td.textContent=desde && hasta && desde>hasta ? 'La fecha inicial debe ser anterior a la final.' : 'No hay compras que coincidan con los filtros.';}
+  document.getElementById('compras-lista').replaceChildren(tabla);
+}
+function abrirFichaCompra(compra) {
+  const proveedor=gestiones.proveedores.registros.find(p=>p.id===String(compra.proveedorId));
+  const items=typeof compra.itemsJson==='string'?JSON.parse(compra.itemsJson):compra.items || compra.itemsJson || [];
+  const tabla=tablaVista(['Producto','Cantidad','Costo unitario','Subtotal']);
+  items.forEach(i=>{const fila=tabla.tBodies[0].insertRow();[i.nombre,i.cantidad,dineroVista(i.costo),dineroVista(i.costo*i.cantidad)].forEach(v=>celdaVista(fila,v));});
+  const envoltura=document.createElement('div');envoltura.className='table-responsive';envoltura.append(tabla);
+  abrirFicha('Compra '+referenciaVisible(compra.id,'CMP'),[datosFicha([['Proveedor',compra.proveedorNombre || proveedor?.nombre],['Documento / NIT',proveedor?.documento],['Contacto',[proveedor?.telefono,proveedor?.correo].filter(Boolean).join(' · ')],['Fecha',fechaVista(compra.fecha)]]),envoltura,datosFicha([['Total',dineroVista(compra.total)]])]);
 }

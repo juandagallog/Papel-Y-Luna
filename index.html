@@ -9,6 +9,8 @@
   <script src="js/api.js" defer></script>
   <script src="js/loading.js" defer></script>
   <script src="js/ui.js" defer></script>
+  <script src="js/vistas.js" defer></script>
+  <script src="js/paginacion.js" defer></script>
   <script src="js/borrador-venta.js" defer></script>
   <script src="js/productos.js" defer></script>
   <script src="js/clientes.js" defer></script>
@@ -29,35 +31,35 @@
   </div>
 
   <header class="main-header">
+    <div class="sidebar-header">
     <div class="header-brand">
       <span class="brand-logo" aria-hidden="true">☾</span>
       <div>
         <h1 class="brand-title">Papel y Luna</h1>
-        <p class="brand-sub">Sistema de Facturación POS — <span id="session-user-badge">Sin sesión</span></p>
+        <p class="brand-sub">Sistema de facturación POS</p>
       </div>
     </div>
-    <label class="theme-control"><span aria-hidden="true">◐</span><span class="sr-only">Tema de color</span><select data-selector-tema><option value="ciruela">Ciruela</option><option value="terracota">Terracota</option><option value="tinta">Azul tinta</option></select></label>
+    <div class="sidebar-identidad"><span id="session-user-badge">Sin sesión</span><div class="theme-control" data-theme-control></div></div>
+    </div>
     <nav class="header-nav" aria-label="Secciones principales">
-      <button type="button" id="btn-nav-pos" class="nav-btn active">POS / Factura</button>
-      <button type="button" id="btn-nav-historial" class="nav-btn">Historial</button>
-      <button type="button" id="btn-nav-clientes" class="nav-btn">Clientes</button>
-      <details class="nav-more" open><summary>Más secciones</summary><div class="nav-more-items">
-      <button type="button" id="btn-nav-faltantes" class="nav-btn">Faltantes</button>
-      <!-- Vistas exclusivas de Administrador -->
-      <button type="button" id="btn-nav-productos" class="nav-btn admin-only">Productos</button>
-      <button type="button" id="btn-nav-categorias" class="nav-btn admin-only">Categorías</button>
-      <button type="button" id="btn-nav-proveedores" class="nav-btn admin-only">Proveedores</button>
-      <button type="button" id="btn-nav-compras" class="nav-btn admin-only">Compras</button>
-      <button type="button" id="btn-nav-descuentos" class="nav-btn admin-only">Descuentos</button>
-      <button type="button" id="btn-nav-reportes" class="nav-btn admin-only">Reportes</button>
-      <button type="button" id="btn-logout" class="nav-btn btn-danger">Salir</button>
-      </div></details>
-    </nav>
+<button type="button" id="btn-nav-inicio" class="nav-btn active"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10 12 3l9 7 M5 9v12h5v-7h4v7h5V9"/></svg><span>Inicio</span></button>
+<button type="button" id="btn-nav-pos" class="nav-btn"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18v13H3z M7 21h10 M12 17v4"/></svg><span>POS</span></button>
+<button type="button" id="btn-nav-productos" class="nav-btn"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7 12 3l8 4v10l-8 4-8-4z M4 7l8 4 8-4 M12 11v10"/></svg><span>Productos</span></button>
+<details class="nav-more" open><summary>Más</summary><div class="nav-more-items">
+<button type="button" id="btn-nav-clientes" class="nav-btn"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-3a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v3 M9 3a4 4 0 1 0 0 8a4 4 0 1 0 0-8 M17 4a4 4 0 0 1 0 7 M22 21v-3a4 4 0 0 0-3-4"/></svg><span>Clientes</span></button>
+<button type="button" id="btn-nav-proveedores" class="nav-btn admin-only"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V7l9-4 9 4v14 M7 10h2 M15 10h2 M7 14h2 M15 14h2 M10 21v-4h4v4"/></svg><span>Proveedores</span></button>
+<button type="button" id="btn-nav-compras" class="nav-btn admin-only"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h2l3 12h11l3-9H6 M9 20h1 M18 20h1"/></svg><span>Compras</span></button>
+<button type="button" id="btn-nav-faltantes" class="nav-btn"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 21h20z M12 9v5 M12 17v1"/></svg><span>Faltantes</span></button>
+<button type="button" id="btn-nav-historial" class="nav-btn"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-7 M3 3v5h5 M12 7v5l3 2"/></svg><span>Historial</span></button>
+<button type="button" id="btn-nav-descuentos" class="nav-btn admin-only"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h7l10 10-7 7L4 11z M8 8h.01"/></svg><span>Descuentos</span></button>
+<button type="button" id="btn-nav-categorias" class="nav-btn admin-only"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z"/></svg><span>Categorías</span></button>
+</div></details></nav>
+<div class="session-actions"><button type="button" id="btn-logout" class="nav-btn btn-danger"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3H3v18h6 M14 8l5 4-5 4 M8 12h11"/></svg><span>Cerrar sesión</span></button></div>
   </header>
 
   <main>
     <!-- 1. VISTA POS / FACTURACIÓN -->
-    <section id="vista-pos" class="pos-container">
+    <section id="vista-pos" class="pos-container vista-oculta">
       <section id="catalogo-productos">
         <div class="catalogo-banner">
           <div class="catalogo-text">
@@ -75,8 +77,8 @@
             <input type="search" id="search-input" placeholder="Buscar producto por nombre, categoria o codigo..." aria-label="Buscar producto">
           </div>
           <div class="view-buttons">
-            <button type="button" id="btn-lista" class="view-btn active">📄 Lista</button>
-            <button type="button" id="btn-catalogo" class="view-btn">🗂️ Catálogo</button>
+            <button type="button" id="btn-lista" class="view-btn active">Lista</button>
+            <button type="button" id="btn-catalogo" class="view-btn">Catálogo</button>
           </div>
         </div>
         <p id="catalogo-estado" role="status"></p>
@@ -86,12 +88,26 @@
 
       <!-- SECCIÓN FACTURA -->
       <section class="invoice-section" id="panel-venta" tabindex="-1" aria-label="Venta actual">
+        <button type="button" id="volver-catalogo-movil" class="btn-secondary">Volver a productos</button>
         <div class="invoice-card">
           <div class="invoice-header">
-            <h2 id="invoice-header-title">Factura de Venta</h2>
-            <p id="invoice-header-sub">Resumen y desglose de compra</p>
+            <h2 id="invoice-header-title">Tu venta</h2>
+            <p id="invoice-header-sub">Productos y detalle del pago</p>
           </div>
+          <details class="pos-menu" id="pos-cliente-menu"><summary><span class="menu-icon" aria-hidden="true">♙</span><span><strong id="pos-cliente-resumen">Consumidor final</strong><small>Seleccionar o crear cliente</small></span><span aria-hidden="true">⌄</span></summary><div class="pos-menu-contenido">              <div class="form-group">
+                <label for="select-cliente">Cliente:</label>
+                <div class="context-field"><select id="select-cliente"><option value="">Sin cliente</option></select><button type="button" id="btn-nuevo-cliente-pos" class="btn-contextual">+ Nuevo</button></div>
+                <small id="clientes-pos-estado" role="status"></small>
+                <small id="venta-abierta-estado" role="status"></small>
+              </div></div></details>
           <div id="invoice-items-list" class="invoice-items-list"></div>
+          <details class="pos-menu pos-menu-descuento"><summary><span id="pos-descuento-resumen">＋ Aplicar descuento</span></summary><div class="pos-menu-contenido">              <div class="form-group">
+                <label for="select-descuento">Descuento</label>
+                <select id="select-descuento">
+                  <option value="">Sin descuento</option>
+                </select>
+                <button type="button" id="btn-descuento-puntual" class="btn-discreto admin-only">Descuento solo para esta factura</button>
+              </div></div></details>
           <div class="invoice-summary">
             <div class="summary-row">
               <span>Subtotal General:</span>
@@ -107,23 +123,11 @@
             </div>
             <hr class="divider">
             <div class="summary-row total-row">
-              <span>TOTAL A PAGAR:</span>
+              <span>Total · COP</span>
               <strong id="total-valor">$0</strong>
             </div>
             <div class="payment-section">
-              <div class="form-group">
-                <label for="select-cliente">Cliente:</label>
-                <div class="context-field"><select id="select-cliente"><option value="">Sin cliente</option></select><button type="button" id="btn-nuevo-cliente-pos" class="btn-contextual">+ Nuevo</button></div>
-                <small id="clientes-pos-estado" role="status"></small>
-                <small id="venta-abierta-estado" role="status"></small>
-              </div>
-              <div class="form-group">
-                <label for="select-descuento">Descuento</label>
-                <select id="select-descuento">
-                  <option value="">Sin descuento</option>
-                </select>
-                <button type="button" id="btn-descuento-puntual" class="btn-discreto admin-only">Descuento solo para esta factura</button>
-              </div>
+
               <div class="form-group">
                 <label for="select-pago">Método de Pago:</label>
                 <select id="select-pago" class="input-pago">
@@ -147,7 +151,7 @@
           </div>
         </div>
       </section>
-      <button type="button" id="acceso-venta-movil" class="acceso-venta-movil">Ver venta <strong id="total-venta-movil">$0</strong><span aria-hidden="true">↓</span></button>
+      <button type="button" id="acceso-venta-movil" class="acceso-venta-movil"><span>Ver factura · <span id="cantidad-venta-movil">0</span> artículos</span><strong id="total-venta-movil">$0</strong></button>
     </section>
 
     <!-- 2. VISTA GESTIÓN DE PRODUCTOS (CRUD) -->
@@ -157,9 +161,10 @@
           <h2>Gestión de Inventario</h2>
           <p>Agrega, edita o elimina productos de tu catálogo.</p>
         </div>
-        <button type="button" id="btn-new-product" class="btn-primary">Nuevo Producto</button>
+        <button type="button" id="btn-new-product" class="btn-primary admin-only">Nuevo Producto</button>
       </div>
-      <div class="table-responsive">
+      <div class="indicadores-productos"><span><strong id="productos-total">0</strong>Total de productos</span><span><strong id="productos-bajos">0</strong>Stock bajo</span><span><strong id="productos-agotados">0</strong>Sin stock</span></div>
+<div class="filtros-listado"><div class="form-group"><label for="productos-buscar">Buscar productos</label><input id="productos-buscar" type="search" placeholder="Nombre, categoría o código"></div><div class="form-group"><label for="productos-categoria">Categoría</label><select id="productos-categoria"><option value="">Todas</option></select></div><div class="form-group"><label for="productos-estado">Estado</label><select id="productos-estado"><option value="">Todos</option><option value="disponible">Disponible</option><option value="bajo">Stock bajo</option><option value="agotado">Sin stock</option></select></div></div><div class="table-responsive">
         <table class="crud-table">
           <thead>
             <tr>
@@ -167,9 +172,9 @@
               <th>Nombre</th>
               <th>Categoría</th>
               <th>Precio Venta</th>
-              <th>Costo</th>
-              <th>Stock</th>
-              <th>Acciones</th>
+              <th class="admin-only">Costo</th>
+              <th>Stock</th><th>Estado</th>
+              <th class="admin-only">Acciones</th>
             </tr>
           </thead>
           <tbody id="products-table-body"></tbody>
@@ -181,10 +186,7 @@
     <section id="vista-historial" class="vista-oculta historial-container">
       <h2>Historial de Ventas</h2>
       <p>Registro de transacciones realizadas en el sistema.</p>
-      <h3>Ventas abiertas</h3>
-      <div id="ventas-abiertas-container" class="historial-list"></div>
-      <h3>Ventas cerradas</h3>
-      <div id="historial-container" class="historial-list"></div>
+      <div class="filtros-listado"><div class="form-group"><label for="historial-buscar">Buscar factura o cliente</label><input id="historial-buscar" type="search"></div><div class="form-group"><label for="historial-estado">Estado</label><select id="historial-estado"><option value="">Todas</option><option value="abierta">Abiertas</option><option value="cerrada">Cerradas</option></select></div></div><div id="historial-container" class="table-responsive"></div>
     </section>
 
     <!-- 4. VISTA CLIENTES -->
@@ -197,14 +199,14 @@
       <form id="cliente-form" class="modal-form">
         <input type="hidden" id="cliente-id">
         <div class="form-group"><label for="cliente-nombre">Nombre:</label><input id="cliente-nombre" required></div>
-        <div class="form-group"><label for="cliente-telefono">Teléfono:</label><input id="cliente-telefono" type="tel"></div>
+        <div class="form-row"><div class="form-group"><label for="cliente-tipo">Tipo</label><select id="cliente-tipo"><option value="persona">Persona</option><option value="empresa">Empresa</option></select></div><div class="form-group"><label for="cliente-documento">Documento (opcional)</label><input id="cliente-documento" maxlength="50"></div></div><div class="form-group"><label for="cliente-direccion">Dirección (opcional)</label><input id="cliente-direccion" maxlength="200"></div><div class="form-group"><label for="cliente-telefono">Teléfono:</label><input id="cliente-telefono" type="tel"></div>
         <div class="form-group"><label for="cliente-correo">Correo:</label><input id="cliente-correo" type="email"></div>
         <div><button type="submit" class="btn-primary">Guardar cliente</button> <button type="button" id="btn-cancelar-cliente" class="btn-primary">Nuevo / Cancelar edición</button></div>
       </form>
       <div class="form-group"><label for="buscar-cliente">Buscar cliente:</label><input id="buscar-cliente" type="search" placeholder="Nombre, teléfono o correo"></div>
       <div class="table-responsive">
         <table class="crud-table">
-          <thead><tr><th>Nombre</th><th>Teléfono</th><th>Correo</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>Cliente</th><th>Documento</th><th>Contacto</th><th>Detalle</th></tr></thead>
           <tbody id="clientes-table-body"></tbody>
         </table>
       </div>
@@ -217,22 +219,22 @@
       <form id="proveedores-form" class="modal-form">
         <input type="hidden" id="proveedores-id">
         <div class="form-group"><label for="proveedores-nombre">Nombre:</label><input id="proveedores-nombre" type="text" required></div>
-        <div class="form-group"><label for="proveedores-telefono">Teléfono:</label><input id="proveedores-telefono" type="tel"></div>
+        <div class="form-row"><div class="form-group"><label for="proveedores-tipo">Tipo</label><select id="proveedores-tipo"><option value="persona">Persona</option><option value="empresa" selected>Empresa</option></select></div><div class="form-group"><label for="proveedores-documento">Documento / NIT (opcional)</label><input id="proveedores-documento" maxlength="50"></div></div><div class="form-group"><label for="proveedores-direccion">Dirección (opcional)</label><input id="proveedores-direccion" maxlength="200"></div><div class="form-group"><label for="proveedores-telefono">Teléfono:</label><input id="proveedores-telefono" type="tel"></div>
         <div class="form-group"><label for="proveedores-correo">Correo:</label><input id="proveedores-correo" type="email"></div>
         <div><button type="submit" class="btn-primary">Guardar</button> <button type="button" id="proveedores-cancelar" class="btn-primary">Nuevo / Cancelar edición</button></div>
       </form>
       <div class="form-group"><label for="proveedores-buscar">Buscar:</label><input id="proveedores-buscar" type="search"></div>
-      <div class="table-responsive"><table class="crud-table"><thead><tr><th>Referencia</th><th>Nombre</th><th>Teléfono</th><th>Correo</th><th>Acciones</th></tr></thead><tbody id="proveedores-body"></tbody></table></div>
+      <div class="table-responsive"><table class="crud-table"><thead><tr><th>Proveedor</th><th>Documento / NIT</th><th>Contacto</th><th>Detalle</th></tr></thead><tbody id="proveedores-body"></tbody></table></div>
     </section>
 
     <!-- 6. VISTA CATEGORÍAS -->
     <section id="vista-categorias" class="vista-oculta admin-container">
-      <div class="crud-header"><h2>Categorías</h2><button type="button" id="categorias-recargar" class="btn-primary">Recargar</button></div>
+      <div class="crud-header"><div><h2>Categorías</h2><p class="section-help">Organiza los productos de tu catálogo.</p></div><div class="acciones-seccion"><button type="button" id="categorias-recargar" class="btn-discreto">Recargar</button><button type="button" id="btn-nueva-categoria" class="btn-primary">Nueva categoría</button></div></div>
       <p id="categorias-estado" role="status"></p>
       <form id="categorias-form" class="modal-form">
         <input type="hidden" id="categorias-id">
         <div class="form-group"><label for="categorias-nombre">Nombre:</label><input id="categorias-nombre" type="text" required></div>
-        <div><button type="submit" class="btn-primary">Guardar</button> <button type="button" id="categorias-cancelar" class="btn-primary">Nuevo / Cancelar edición</button></div>
+        <div><button type="submit" class="btn-primary">Guardar</button> <button type="button" id="categorias-cancelar" class="btn-secondary">Cancelar</button></div>
       </form>
       <div class="form-group"><label for="categorias-buscar">Buscar:</label><input id="categorias-buscar" type="search"></div>
       <div class="table-responsive"><table class="crud-table"><thead><tr><th>Referencia</th><th>Nombre</th><th>Acciones</th></tr></thead><tbody id="categorias-body"></tbody></table></div>
@@ -240,7 +242,7 @@
 
     <!-- 7. VISTA COMPRAS -->
     <section id="vista-compras" class="vista-oculta admin-container">
-      <div class="crud-header"><div><h2>Compras</h2><p class="section-help">Registra una compra con todos sus productos y costos.</p></div><button type="button" id="btn-recargar-compras" class="btn-discreto">↻ Recargar</button></div>
+      <div class="crud-header"><div><h2>Compras</h2><p class="section-help">Registra una compra con todos sus productos y costos.</p></div><div class="acciones-seccion"><button type="button" id="btn-recargar-compras" class="btn-discreto">↻ Recargar</button><button type="button" id="btn-nueva-compra" class="btn-primary">＋ Registrar compra</button></div></div>
       <form id="compra-form" class="modal-form">
         <fieldset class="compra-paso"><legend><span class="paso-numero">1</span> Proveedor</legend>
           <div class="context-field"><div class="form-group"><label for="compra-proveedor">Selecciona el proveedor</label><select id="compra-proveedor" required><option value="">Selecciona un proveedor</option></select></div><button type="button" id="btn-nuevo-proveedor-compra" class="btn-contextual">+ Nuevo proveedor</button></div>
@@ -259,19 +261,19 @@
         <div class="compra-confirmar"><p class="section-help">Revisa los productos, cantidades y costos antes de registrar.</p><button type="submit" id="btn-registrar-compra" class="btn-primary">Registrar compra</button></div>
       </form>
       <p id="compra-estado" role="status"></p>
-      <details class="compras-historial" open><summary>Compras registradas</summary><p id="compras-lista-estado" role="status"></p><div id="compras-lista" class="historial-list"></div></details>
+      <div class="filtros-listado"><div class="form-group"><label for="compras-buscar">Buscar compra o proveedor</label><input id="compras-buscar" type="search"></div><div class="form-group"><label for="compras-fecha-desde">Desde</label><input id="compras-fecha-desde" type="date"></div><div class="form-group"><label for="compras-fecha-hasta">Hasta</label><input id="compras-fecha-hasta" type="date"></div></div><p id="compras-lista-estado" role="status"></p><div id="compras-lista" class="table-responsive"></div>
     </section>
 
     <!-- 8. VISTA DESCUENTOS (NUEVO MVP 3) -->
     <section id="vista-descuentos" class="vista-oculta admin-container">
       <div class="crud-header">
         <div>
-          <h2>Catálogo de Descuentos</h2>
+          <h2>Descuentos</h2>
           <p>Crea descuentos porcentuales o de valor fijo reutilizables en las ventas.</p>
         </div>
-        <button type="button" id="descuentos-recargar" class="btn-primary">Recargar</button>
+        <div class="acciones-seccion"><button type="button" id="descuentos-recargar" class="btn-discreto">Recargar</button><button type="button" id="btn-nuevo-descuento" class="btn-primary">Nuevo descuento</button></div>
       </div>
-      <p id="descuentos-estado" role="status"></p>
+      <p id="descuentos-estado" role="status"></p><div class="filtros-listado"><div class="form-group"><label for="descuentos-buscar">Buscar descuento</label><input id="descuentos-buscar" type="search"></div><div class="form-group"><label for="descuentos-filtro">Disponibilidad</label><select id="descuentos-filtro"><option value="">Todos</option><option value="true">Disponible</option><option value="false">No disponible</option></select></div></div>
       <form id="descuentos-form" class="modal-form">
         <input type="hidden" id="descuentos-id">
         <div class="form-row">
@@ -292,13 +294,13 @@
           </div>
         </div>
         <div>
-          <button type="submit" class="btn-primary">Guardar descuento</button>
-          <button type="button" id="descuentos-cancelar" class="btn-primary">Nuevo / Cancelar edición</button>
+          <div class="form-group"><label for="descuentos-disponible">Estado</label><select id="descuentos-disponible"><option value="true">Disponible</option><option value="false">No disponible</option></select></div><button type="submit" class="btn-primary">Guardar descuento</button>
+          <button type="button" id="descuentos-cancelar" class="btn-secondary">Cancelar</button>
         </div>
       </form>
       <div class="table-responsive">
         <table class="crud-table">
-          <thead><tr><th>Nombre</th><th>Tipo</th><th>Valor</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Tipo</th><th>Valor</th><th>Estado</th><th>Acciones</th></tr></thead>
           <tbody id="descuentos-body"></tbody>
         </table>
       </div>
@@ -311,7 +313,7 @@
           <h2>Faltantes</h2>
           <p class="section-help">Registra la demanda que no pudiste atender.</p>
         </div>
-        <button type="button" id="btn-recargar-faltantes" class="btn-discreto">↻ Recargar</button>
+        <div class="acciones-seccion"><button type="button" id="btn-recargar-faltantes" class="btn-discreto">↻ Recargar</button><button type="button" id="btn-nuevo-faltante" class="btn-primary">＋ Registrar faltante</button></div>
       </div>
       <div class="faltantes-layout"><section class="panel-faltante"><h3>Nueva solicitud</h3>
       <form id="faltante-form" class="modal-form">
@@ -342,11 +344,11 @@
             <select id="faltante-proveedor"><option value="">Sin proveedor</option></select>
           </div>
         </div>
-        <button type="submit" class="btn-primary">Registrar faltante</button>
+        <div class="form-group"><label for="faltante-notas">Notas (opcional)</label><textarea id="faltante-notas" maxlength="1000" rows="3"></textarea></div><button type="submit" class="btn-primary">Registrar faltante</button>
       </form>
       <details class="ayuda-contextual"><summary>¿Cómo se usa?</summary><p>Registra lo que pidió el cliente. El resumen agrupa pendientes por producto y proveedor para orientar próximas compras. Marca la solicitud resuelta cuando la atiendas.</p></details>
       </section><section class="panel-faltante resultados-faltantes">
-      <div class="form-row filtros-faltantes">
+      <div class="filtros-listado filtros-faltantes"><div class="form-group"><label for="faltantes-buscar">Buscar producto o descripción</label><input id="faltantes-buscar" type="search"></div><div class="form-group"><label for="faltantes-estado">Estado</label><select id="faltantes-estado"><option value="">Todos</option><option value="pendiente">Pendiente</option><option value="resuelto">Resuelto</option></select></div>
         <div class="form-group">
           <label for="filtro-faltante-tipo">Filtrar por tipo:</label>
           <select id="filtro-faltante-tipo">
@@ -361,31 +363,31 @@
         </div>
       </div>
 
-      <h3>Pendientes para comprar</h3>
       <div class="table-responsive">
         <table class="crud-table">
-          <thead><tr><th>Producto solicitado</th><th>Tipo</th><th>Proveedor</th><th>Solicitudes</th><th>Cantidad total</th></tr></thead>
-          <tbody id="faltantes-agrupados-body"></tbody>
-        </table>
-      </div>
-
-      <details class="detalle-solicitudes"><summary>Ver todas las solicitudes y resolver</summary>
-      <div class="table-responsive">
-        <table class="crud-table">
-          <thead><tr><th>Fecha</th><th>Producto / Descripción</th><th>Tipo</th><th>Cantidad</th><th>Proveedor</th><th>Estado</th><th>Acción</th></tr></thead>
+          <thead><tr><th>Producto / Descripción</th><th>Tipo</th><th>Cantidad</th><th>Proveedor</th><th>Estado</th><th>Fecha</th><th>Detalle</th></tr></thead>
           <tbody id="faltantes-table-body"></tbody>
         </table>
       </div>
-      </details></section></div>
+      </section></div>
     </section>
 
     <!-- 10. VISTA REPORTES (NUEVO MVP 3) -->
-    <section id="vista-reportes" class="vista-oculta admin-container">
+    <section id="vista-inicio" class="admin-container dashboard-inicio">
+      <div class="crud-header"><div><p class="eyebrow">Inicio · Tu operación de hoy</p><h2>Todo listo para un buen día.</h2><p id="inicio-fecha" class="section-help"></p></div><div class="acciones-seccion"><button type="button" id="inicio-nueva-venta" class="btn-secondary">Ir al POS →</button><button type="button" id="inicio-reportes" class="btn-primary admin-only">Generar reporte</button></div></div>
+      <div id="inicio-resumen" class="dashboard-resumen" aria-live="polite"></div>
+      <div class="dashboard-paneles">
+        <section class="dashboard-panel"><div class="panel-cabecera"><h3>Movimientos recientes</h3><div class="acciones-seccion"><button type="button" id="inicio-historial" class="btn-discreto">Ver historial →</button><button type="button" id="inicio-compras" class="btn-discreto admin-only">Ver compras →</button></div></div><div id="inicio-movimientos"></div></section>
+        <section class="dashboard-panel dashboard-atencion"><h3>Inventario que requiere atención</h3><div id="inicio-inventario"></div><div class="inicio-accesos"><button type="button" id="inicio-inventario-ir" class="btn-secondary">Ir a inventario →</button><div class="dashboard-enlaces"><span>Continúa donde lo dejaste</span><button type="button" id="inicio-abiertas" class="btn-discreto">Ver ventas abiertas →</button><button type="button" id="inicio-faltantes" class="btn-discreto">Ir a faltantes →</button></div></div></section>
+      </div>
+    </section>
+    <section id="vista-reportes" class="admin-container admin-only vista-oculta dashboard-reportes">
       <div class="crud-header">
         <div>
-          <h2>Reportes Administrativos</h2>
-          <p>Consulta ventas, productos más vendidos, compras y faltantes frecuentes por rango de fechas (mínimo 1 día).</p>
+          <p class="eyebrow">Resultados del negocio</p><h2>Reporte de actividad</h2>
+          <p id="reporte-periodo" class="section-help" aria-live="polite">Selecciona el período que quieres consultar.</p>
         </div>
+        <button type="button" id="reportes-volver" class="btn-secondary">← Volver a Inicio</button>
       </div>
       <form id="reportes-form" class="modal-form">
         <div class="form-row">
@@ -404,29 +406,31 @@
       </form>
       <div id="reportes-resumen-cards" class="historial-list reporte-indicadores"></div>
 
-      <h3 class="reporte-titulo">Productos más vendidos en el rango</h3>
+      <div class="reporte-secciones">
+      <details class="reporte-seccion" open><summary><span>Productos más vendidos<small>Unidades e ingresos de las líneas en el período</small></span><span id="reporte-vendidos-cantidad" class="estado-badge estado-neutro"></span></summary>
       <div class="table-responsive">
         <table class="crud-table">
           <thead><tr><th>Producto</th><th>Unidades Vendidas</th><th>Subtotal Generado</th></tr></thead>
           <tbody id="reporte-mas-vendidos-body"></tbody>
         </table>
       </div>
-
-      <h3 class="reporte-titulo">Compras registradas en el rango</h3>
+      </details>
+      <details class="reporte-seccion"><summary><span>Compras registradas<small>Proveedor, fecha e importe de cada compra</small></span><span id="reporte-compras-cantidad" class="estado-badge estado-neutro"></span></summary>
       <div class="table-responsive">
         <table class="crud-table">
           <thead><tr><th>Referencia</th><th>Fecha</th><th>Proveedor</th><th>Total Compra</th></tr></thead>
           <tbody id="reporte-compras-body"></tbody>
         </table>
       </div>
-
-      <h3 class="reporte-titulo">Faltantes frecuentes</h3>
+      </details>
+      <details class="reporte-seccion"><summary><span>Faltantes frecuentes<small>Acumulado histórico; este indicador no se filtra por fecha</small></span><span id="reporte-faltantes-cantidad" class="estado-badge estado-neutro"></span></summary>
       <div class="table-responsive">
         <table class="crud-table">
           <thead><tr><th>Nombre Normalizado</th><th>Tipo</th><th>Veces Solicitado</th><th>Unidades Totales</th></tr></thead>
           <tbody id="reporte-faltantes-body"></tbody>
         </table>
       </div>
+      </details></div>
     </section>
   </main>
 
@@ -435,7 +439,7 @@
     <div class="modal-card login-layout">
       <aside class="login-story"><span class="login-moon" aria-hidden="true">☾</span><p class="login-brand">papel y luna</p><h2>Un buen día empieza en orden.</h2><p>Tu papelería, a tu ritmo.</p></aside>
       <div class="login-content">
-      <label class="theme-control"><span aria-hidden="true">◐</span><span class="sr-only">Tema de color</span><select data-selector-tema><option value="ciruela">Ciruela</option><option value="terracota">Terracota</option><option value="tinta">Azul tinta</option></select></label>
+      <div class="theme-control" data-theme-control></div>
       <div class="modal-header">
         <h3 id="login-modal-title">Bienvenido de nuevo</h3>
       </div>
@@ -505,7 +509,7 @@
       <form id="nuevo-proveedor-form" class="modal-form">
         <input type="hidden" id="nuevo-proveedor-id">
         <div class="form-group"><label for="nuevo-proveedor-nombre">Nombre</label><input id="nuevo-proveedor-nombre" required></div>
-        <div class="form-group"><label for="nuevo-proveedor-telefono">Teléfono</label><input type="tel" id="nuevo-proveedor-telefono"></div>
+        <div class="form-row"><div class="form-group"><label for="nuevo-proveedor-tipo">Tipo</label><select id="nuevo-proveedor-tipo"><option value="persona">Persona</option><option value="empresa" selected>Empresa</option></select></div><div class="form-group"><label for="nuevo-proveedor-documento">Documento / NIT (opcional)</label><input id="nuevo-proveedor-documento" maxlength="50"></div></div><div class="form-group"><label for="nuevo-proveedor-direccion">Dirección (opcional)</label><input id="nuevo-proveedor-direccion" maxlength="200"></div><div class="form-group"><label for="nuevo-proveedor-telefono">Teléfono</label><input type="tel" id="nuevo-proveedor-telefono"></div>
         <div class="form-group"><label for="nuevo-proveedor-correo">Correo</label><input type="email" id="nuevo-proveedor-correo"></div>
         <div class="modal-actions"><button type="button" id="btn-cancelar-nuevo-proveedor" class="btn-cancel">Cancelar</button><button type="submit" class="btn-primary">Crear proveedor</button></div>
       </form>

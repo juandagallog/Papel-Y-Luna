@@ -123,6 +123,11 @@ def resolver_descuento(datos, usuario, venta_existente=None):
         descuento = Descuento.objects.filter(pk=str(descuento_id)).first()
         if not descuento:
             error_negocio("El descuento seleccionado no existe.")
+        if venta_existente and str(venta_existente.descuento_id) == str(descuento_id):
+            return (descuento, venta_existente.descuento_nombre_historico,
+                    venta_existente.descuento_tipo_historico, venta_existente.descuento_valor_historico)
+        if not descuento.disponible:
+            error_negocio("El descuento seleccionado no está disponible para nuevas ventas.")
         return descuento, descuento.nombre, descuento.tipo, descuento.valor
     return None, "", "", 0
 
@@ -381,7 +386,7 @@ def corregir_venta_cerrada(venta, datos, usuario=None):
             venta.descuento_nombre_historico,
             venta.descuento_tipo_historico,
             venta.descuento_valor_historico,
-        ) = resolver_descuento(datos, usuario)
+        ) = resolver_descuento(datos, usuario, venta)
 
     # Reconstruir líneas y recalcular totales
     venta.items.all().delete()

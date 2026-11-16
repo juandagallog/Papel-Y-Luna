@@ -17,6 +17,7 @@ __pycache__/
 # Base de datos local SQLite y estáticos generados
 backend/db.sqlite3
 backend/db.sqlite3-journal
+backend/backups/
 backend/staticfiles/
 db.sqlite3
 
@@ -25,3 +26,17 @@ db.sqlite3
 Thumbs.db
 .vscode/
 .idea/
+
+# Material de estudio local; no forma parte del despliegue MVP3.
+*.md
+docs/
+tests/
+backend/tienda/tests.py
+AppsScript.gs
+backend/seed_users.py
+backend/tienda/management/
+
+# Exportaciones y archivos auxiliares de SQLite.
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm

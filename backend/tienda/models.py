@@ -39,6 +39,9 @@ class Categoria(models.Model):
 
 
 class Proveedor(models.Model):
+    tipo = models.CharField(max_length=10, choices=[("persona", "Persona"), ("empresa", "Empresa")], default="empresa")
+    documento = models.CharField(max_length=50, blank=True, default="")
+    direccion = models.CharField(max_length=200, blank=True, default="")
     id = models.CharField(max_length=64, primary_key=True, default=generar_id)
     nombre = models.CharField(max_length=150)
     telefono = models.CharField(max_length=50, blank=True, default="")
@@ -54,6 +57,7 @@ class Proveedor(models.Model):
 class Cliente(models.Model):
     id = models.CharField(max_length=64, primary_key=True, default=generar_id)
     nombre = models.CharField(max_length=150)
+    tipo = models.CharField(max_length=10, choices=[("persona", "Persona"), ("empresa", "Empresa")], default="persona")
     documento = models.CharField(max_length=50, blank=True, default="")
     telefono = models.CharField(max_length=50, blank=True, default="")
     correo = models.CharField(max_length=150, blank=True, default="")
@@ -101,6 +105,7 @@ class Descuento(models.Model):
     nombre = models.CharField(max_length=120, unique=True)
     tipo = models.CharField(max_length=20, choices=TIPOS)
     valor = models.BigIntegerField()
+    disponible = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["nombre"]
@@ -320,6 +325,7 @@ class Faltante(models.Model):
         related_name="faltantes",
     )
     descripcion = models.CharField(max_length=150)
+    notas = models.TextField(blank=True, default="", max_length=1000)
     nombre_normalizado = models.CharField(max_length=150, db_index=True)
     cantidad_solicitada = models.PositiveIntegerField(default=1)
     fecha = models.DateTimeField(default=timezone.now)

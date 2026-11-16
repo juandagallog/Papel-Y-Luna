@@ -53,77 +53,40 @@ async function renderHistorial(refrescarTrasCarga = false) {
   }
 }
 
+let ventasHistorial = [];
 async function cargarYRenderizarHistorial() {
-  const historialContainer = document.querySelector("#historial-container");
-  if (!historialContainer) return;
-  const quitarHistorial = mostrarSkeleton(historialContainer, "resumen-ventas");
-  const quitarAbiertas = mostrarSkeleton(
-    document.getElementById("ventas-abiertas-container"),
-    "tarjetas"
-  );
-  let ventas = [];
-  let abiertas = [];
+  const contenedor=document.getElementById('historial-container');
+  const quitar=mostrarSkeleton(contenedor,'resumen-ventas');
   try {
-    const datos = await apiGet("ventas");
-    abiertas = datos
-      .filter(venta => venta.estado === "abierta")
-      .map(adaptarVentaRemota);
-    ventas = datos
-      .filter(venta => venta.estado === "cerrada")
-      .map(adaptarVentaRemota);
-  } catch (error) {
-    mostrarNotificacion("Error cargando historial: " + error.message, "error");
-    return;
-  } finally {
-    quitarHistorial();
-    quitarAbiertas();
-  }
-
-  const contenedorAbiertas = document.getElementById("ventas-abiertas-container");
-  contenedorAbiertas.replaceChildren();
-  if (!abiertas.length) {
-    const vacio = document.createElement("p");
-    vacio.textContent = "No hay ventas abiertas.";
-    contenedorAbiertas.appendChild(vacio);
-  }
-  abiertas.forEach(venta => {
-    const card = document.createElement("article");
-    card.className = "historial-card";
-    const fechaLegible = new Date(venta.fecha).toLocaleString("es-CO");
-    const texto = document.createElement("p");
-    texto.textContent = `${fechaLegible} | ${nombreCliente(venta.clienteId)} | $${venta.total.toLocaleString("es-CO")}`;
-    const boton = document.createElement("button");
-    boton.type = "button";
-    boton.className = "btn-primary";
-    boton.textContent = "Retomar";
-    boton.addEventListener("click", async () => {
-      boton.disabled = true;
-      try {
-        await retomarVentaAbierta(venta.id);
-      } finally {
-        boton.disabled = false;
-      }
-    });
-    card.append(texto, boton);
-    contenedorAbiertas.appendChild(card);
+    const datos=await apiGet('ventas');
+    const validas=datos.map(adaptarVentaRemota);
+    ventasHistorial=validas;
+    renderTablaHistorial();
+  } catch(error) { mostrarNotificacion('Error cargando historial: '+error.message,'error'); }
+  finally {quitar();}
+}
+function renderTablaHistorial() {
+  const tabla=tablaVista(['Factura','Fecha y hora','Cliente','Total','Estado','Detalle']);
+  const q=document.getElementById('historial-buscar').value.trim().toLowerCase();
+  const estado=document.getElementById('historial-estado').value;
+  paginarListado('historial', ventasHistorial.filter(v=>(!estado || v.estado===estado) && (!q || [referenciaVisible(v.id,'VTA'),nombreCliente(v.clienteId)].some(t=>t.toLowerCase().includes(q)))), JSON.stringify([q,estado]), document.getElementById('historial-container'), renderTablaHistorial).forEach(v=>{
+    const fila=tabla.tBodies[0].insertRow(); fila.dataset.ventaId=v.id;
+    const ref=celdaVista(fila,referenciaVisible(v.id,'VTA'));
+    if(v.corregida) ref.append(document.createElement('br'),insigniaEstado('bajo','Corregida'));
+    if(v.tieneReembolsos) ref.append(document.createElement('br'),insigniaEstado('agotado','Con reembolso'));
+    celdaVista(fila,fechaVista(v.fecha)); celdaVista(fila,nombreCliente(v.clienteId)); celdaVista(fila,dineroVista(v.total));
+    const estadoCelda=fila.insertCell(); estadoCelda.dataset.label='Estado'; estadoCelda.append(insigniaEstado(v.estado==='abierta'?'bajo':'disponible',v.estado==='abierta'?'Abierta':'Cerrada'));
+    filaConDetalle(fila,()=>abrirFicha('Venta '+referenciaVisible(v.id,'VTA'),[contenidoFichaVenta(v)]));
   });
-
-  historialContainer.innerHTML = "";
-  if (ventas.length === 0) {
-    const pVacio = document.createElement("p");
-    pVacio.classList.add("historial-vacio");
-    pVacio.textContent = "No hay ventas en el historial.";
-    historialContainer.appendChild(pVacio);
-    return;
-  }
-
-  const esUsuarioAdmin = window.usuarioActual && window.usuarioActual.esAdmin;
-
-  ventas.forEach(venta => {
-    const card = document.createElement("details");
+  if(!tabla.tBodies[0].rows.length) {const td=tabla.tBodies[0].insertRow().insertCell(); td.colSpan=6; td.className='tabla-vacia'; td.textContent='No hay ventas que coincidan con los filtros.';}
+  document.getElementById('historial-container').replaceChildren(tabla);
+}
+function contenidoFichaVenta(venta) {
+  const esUsuarioAdmin=Boolean(window.usuarioActual?.esAdmin);
+    const card = document.createElement("article");
     card.classList.add("historial-card", "venta-detalle");
 
-    const cardHeader = document.createElement("summary");
+    const cardHeader = document.createElement("div");
     cardHeader.classList.add("historial-card-header");
     const infoHeader = document.createElement("div");
     const idText = document.createElement("strong");
@@ -181,6 +144,8 @@ async function cargarYRenderizarHistorial() {
       li.appendChild(spanPrecio);
       lista.appendChild(li);
     });
+    const cliente = clientes.find(c => c.id === String(venta.clienteId));
+    cardBody.append(datosFicha([['Estado',venta.estado],['Cliente',cliente?.nombre || nombreCliente(venta.clienteId)],['Documento',cliente?.documento],['Contacto',[cliente?.telefono,cliente?.correo].filter(Boolean).join(' · ')],['Dirección',cliente?.direccion]]));
     cardBody.appendChild(tituloDetalle);
     cardBody.appendChild(lista);
 
@@ -211,6 +176,7 @@ async function cargarYRenderizarHistorial() {
       deudaText.textContent = `Saldo pendiente: $${venta.saldoPendiente.toLocaleString("es-CO")}`;
       cardPago.appendChild(deudaText);
     }
+    cardBody.append(datosFicha([['Subtotal',dineroVista(venta.subtotal)],['IVA',dineroVista(venta.iva)],['Total',dineroVista(venta.total)]]));
     cardBody.appendChild(cardPago);
 
     const cardFooter = document.createElement("div");
@@ -226,10 +192,14 @@ async function cargarYRenderizarHistorial() {
         mostrarNotificacion(error.message, "error");
       }
     });
-    cardFooter.appendChild(btnImprimir);
+    if (venta.estado === 'cerrada') cardFooter.appendChild(btnImprimir);
+    else {
+      const retomar=document.createElement('button'); retomar.type='button'; retomar.className='btn-primary'; retomar.textContent='Retomar venta';
+      retomar.addEventListener('click',async()=>{retomar.disabled=true; try { cerrarFicha(); await retomarVentaAbierta(venta.id); } finally {retomar.disabled=false;}}); cardFooter.append(retomar);
+    }
 
     // Botones administrativos: Corregir y Reembolsar (Requisitos 3.4, 3.5 y 3.8)
-    if (esUsuarioAdmin) {
+    if (esUsuarioAdmin && venta.estado === "cerrada") {
       const btnCorregir = document.createElement("button");
       btnCorregir.type = "button";
       btnCorregir.className = "btn-editar";
@@ -241,7 +211,8 @@ async function cargarYRenderizarHistorial() {
         btnCorregir.disabled = true; btnCorregir.setAttribute('aria-busy', 'true');
         try {
           // Leer la versión actual evita reabrir snapshots anteriores a una corrección.
-          iniciarCorreccionVenta(adaptarVentaRemota(await apiGet(`ventas/${venta.id}`)));
+          const actual=adaptarVentaRemota(await apiGet(`ventas/${venta.id}`));
+          cerrarFicha(); iniciarCorreccionVenta(actual);
         } catch (error) { mostrarNotificacion(error.message, 'error'); }
         finally { btnCorregir.disabled = !!venta.tieneReembolsos; btnCorregir.removeAttribute('aria-busy'); }
       });
@@ -250,7 +221,7 @@ async function cargarYRenderizarHistorial() {
       btnReembolsar.type = "button";
       btnReembolsar.className = "btn-eliminar";
       btnReembolsar.textContent = "Reembolsar";
-      btnReembolsar.addEventListener("click", () => abrirModalReembolso(venta));
+      btnReembolsar.addEventListener("click", () => { cerrarFicha(); abrirModalReembolso(venta); });
 
       cardFooter.append(btnCorregir, btnReembolsar);
     }
@@ -258,8 +229,7 @@ async function cargarYRenderizarHistorial() {
     card.appendChild(cardHeader);
     card.appendChild(cardBody);
     card.appendChild(cardFooter);
-    historialContainer.appendChild(card);
-  });
+  return card;
 }
 
 // --- MODAL DE REEMBOLSOS (Requisito 3.5) ---

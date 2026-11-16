@@ -16,7 +16,18 @@ const productsTableBody = document.querySelector('#products-table-body');
 if (!productsTableBody) return;
 productsTableBody.innerHTML = "";
 
-listaProductos.forEach(prod => {
+const esAdmin = Boolean(window.usuarioActual?.esAdmin);
+document.getElementById('productos-total').textContent = listaProductos.length;
+document.getElementById('productos-agotados').textContent = listaProductos.filter(p => p.trackStock && p.stock <= 0).length;
+document.getElementById('productos-bajos').textContent = listaProductos.filter(p => estadoProducto(p).clave === 'bajo').length;
+productsTableBody.closest('table').classList.add('tabla-fichas');
+const selectCategoria=document.getElementById('productos-categoria'), categoriaActual=selectCategoria.value;
+selectCategoria.replaceChildren(new Option('Todas',''));
+categorias.forEach(c=>selectCategoria.add(new Option(c.nombre,c.id))); selectCategoria.value=categoriaActual;
+const texto=document.getElementById('productos-buscar').value.trim().toLocaleLowerCase('es');
+const estado=document.getElementById('productos-estado').value;
+const filtrados=listaProductos.filter(p => (!texto || [p.nombre,p.codigo,p.categoria].some(v=>String(v).toLocaleLowerCase('es').includes(texto))) && (!selectCategoria.value || p.categoriaId===selectCategoria.value) && (!estado || estadoProducto(p).clave===estado));
+paginarListado('productos', filtrados, JSON.stringify([texto,categoriaActual,estado]), productsTableBody.closest('.table-responsive'), () => renderTablaCRUD(productos)).forEach(prod => {
     let textoStock = "No aplica";
 
     if (prod.trackStock) {
@@ -28,14 +39,16 @@ listaProductos.forEach(prod => {
     <td>${escaparHTML(prod.nombre)}</td>
     <td>${escaparHTML(prod.categoria)}</td>
     <td>$${prod.precio.toLocaleString('es-CO')}</td>
-    <td>$${(prod.costo || 0).toLocaleString('es-CO')}</td>
-    <td>${textoStock}</td>
-    <td>
-        <button type="button" class="btn-editar" data-id="${escaparHTML(prod.id)}">✏️</button>
-        <button type="button" class="btn-eliminar" data-id="${escaparHTML(prod.id)}">🗑️</button>
-    </td>
+    ${esAdmin ? `<td>${dineroVista(prod.costo)}</td>` : ''}
+    <td>${textoStock}</td><td><span class="estado-badge estado-${estadoProducto(prod).clave}">${estadoProducto(prod).texto}</span></td>
+    ${esAdmin ? `<td>
+        <button type="button" class="btn-editar" data-id="${escaparHTML(prod.id)}">Editar</button>
+        <button type="button" class="btn-eliminar" data-id="${escaparHTML(prod.id)}">Eliminar</button>
+    </td>` : ''}
     `;
     productsTableBody.appendChild(tr);
+    const etiquetas = ['Código','Producto','Categoría','Precio',...(esAdmin?['Costo']:[]),'Stock','Estado',...(esAdmin?['Acciones']:[])];
+    [...tr.cells].forEach((td,i)=>td.dataset.label=etiquetas[i]);
 });
 
   // Asigna eventos a los botones recién creados
@@ -89,6 +102,8 @@ edicionProductoDesdePOS = desdePOS;
 creacionProductoDesdeCompra = desdeCompra;
 creacionProductoDesdePOS = crearEnPOS;
 document.getElementById('product-description').disabled = !window.usuarioActual.esAdmin;
+for (const id of ['product-code','product-description','product-stock']) document.getElementById(id).closest('.form-group').classList.toggle('hidden', !window.usuarioActual.esAdmin);
+document.getElementById('track-inventory').closest('.checkbox-row').classList.toggle('hidden', !window.usuarioActual.esAdmin);
 document.getElementById('track-inventory').disabled = desdePOS;
 
 if (productId) {

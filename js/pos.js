@@ -3,6 +3,10 @@ let productos = [];
 let categorias = [];
 let descuentosCatalogo = [];
 let descuentoPuntualActual = null;
+let descuentoHistoricoCatalogo = null;
+function descuentoHistoricoVigente() {
+  return descuentoHistoricoCatalogo && descuentoHistoricoCatalogo.ventaId === String(ventaAbiertaActualId || ventaEnCorreccion?.id || '') ? descuentoHistoricoCatalogo : null;
+}
 
 function payloadDescuentoFactura() {
   if (document.getElementById('select-descuento').value === '__puntual__' && descuentoPuntualActual) {
@@ -15,6 +19,7 @@ function payloadDescuentoFactura() {
 
 function restaurarDescuentoVenta(venta) {
   descuentoPuntualActual = null;
+  descuentoHistoricoCatalogo = venta.descuentoId ? { ventaId:String(venta.id), id:String(venta.descuentoId), nombre:venta.descuentoNombre, tipo:venta.descuentoTipo, valor:Number(venta.descuentoValor) } : null;
   actualizarSelectDescuentosPOS();
   if (venta.descuentoId && descuentosCatalogo.some(d => d.id === String(venta.descuentoId))) {
     document.getElementById('select-descuento').value = String(venta.descuentoId);
@@ -69,13 +74,15 @@ function actualizarSelectDescuentosPOS() {
   if (!select) return;
   const actual = select.value;
   select.replaceChildren(new Option("Sin descuento", ""));
-  descuentosCatalogo.forEach(d => {
+  const historico = descuentoHistoricoVigente();
+  descuentosCatalogo.filter(d => d.disponible !== false && d.id !== historico?.id).forEach(d => {
     const etiqueta =
       d.tipo === "porcentaje"
         ? `${d.nombre} (${d.valor}%)`
         : `${d.nombre} (-$${Number(d.valor).toLocaleString("es-CO")})`;
     select.add(new Option(etiqueta, String(d.id)));
   });
+  if (historico) select.add(new Option(`${historico.nombre} · Condición original de esta venta`, historico.id));
   if (descuentoPuntualActual) select.add(new Option(`Solo esta venta (${descuentoPuntualActual.tipo === 'porcentaje' ? descuentoPuntualActual.valor + '%' : '$' + descuentoPuntualActual.valor.toLocaleString('es-CO')})`, '__puntual__'));
   if (actual && descuentosCatalogo.some(d => String(d.id) === actual)) {
     select.value = actual;
@@ -121,6 +128,7 @@ async function cargarCatalogoRemoto() {
           nombre: String(d.nombre),
           tipo: String(d.tipo),
           valor: Number(d.valor),
+          disponible: d.disponible !== false,
         }))
       : [];
     productos = datosProductos.map(adaptarProducto);
@@ -194,8 +202,9 @@ function renderizarProductos(listaProductos) {
             <span class="product-cat-tag">${escaparHTML(producto.categoria)}</span>
             <h4 class="pos-list-title">${escaparHTML(producto.nombre)}</h4>
           </div>
-          <span class="pos-list-desc">${producto.descripcion || ""}</span>
+          <span class="pos-list-desc">${escaparHTML(producto.codigo)} · ${escaparHTML(producto.descripcion || "")}</span>
         </div>
+        <div class="pos-list-stock"><span class="estado-badge estado-${estadoProducto(producto).clave}">${producto.trackStock ? producto.stock + ' un.' : 'Sin seguimiento'}</span></div>
         <div class="pos-list-price-container">
           <span class="pos-list-price">$${producto.precio.toLocaleString("es-CO")}</span>
         </div>
@@ -258,6 +267,7 @@ function renderizarProductos(listaProductos) {
       descripcion.classList.add("product-desc");
       descripcion.textContent = producto.descripcion;
       tarjeta.appendChild(descripcion);
+      tarjeta.appendChild(insigniaEstado(estadoProducto(producto).clave, producto.trackStock ? `${producto.stock} un. · ${estadoProducto(producto).texto}` : 'Sin seguimiento'));
 
       const pieProducto = document.createElement("div");
       pieProducto.classList.add("product-footer");
@@ -372,7 +382,8 @@ function renderizarFactura() {
     detalles.appendChild(nombre);
     const subtotalProducto = Math.round(item.precio * item.cantidad);
     const detallesPrecio = document.createElement("p");
-    detallesPrecio.textContent = `$${item.precio.toLocaleString("es-CO")} x ${item.cantidad} = $${subtotalProducto.toLocaleString("es-CO")}`;
+    detallesPrecio.textContent = `${dineroVista(item.precio)} / unidad`;
+    const importe = document.createElement("strong"); importe.className="item-importe"; importe.textContent=dineroVista(subtotalProducto); fila.append(importe);
     detalles.appendChild(detallesPrecio);
     fila.appendChild(detalles);
 
@@ -380,14 +391,17 @@ function renderizarFactura() {
     acciones.classList.add("item-actions");
     const botonMenos = document.createElement("button");
     botonMenos.textContent = "-";
+    botonMenos.setAttribute('aria-label', `Reducir cantidad de ${item.nombre}`);
     botonMenos.classList.add("btn-cantidad-input");
     const botonMas = document.createElement("button");
     botonMas.textContent = "+";
+    botonMas.setAttribute('aria-label', `Aumentar cantidad de ${item.nombre}`);
     botonMas.classList.add("btn-cantidad-input");
     const cantidadTexto = document.createElement("span");
     cantidadTexto.textContent = item.cantidad;
     const botonEliminar = document.createElement("button");
-    botonEliminar.textContent = "🗑️";
+    botonEliminar.textContent = "×";
+    botonEliminar.setAttribute('aria-label', `Quitar ${item.nombre}`);
     botonEliminar.classList.add("btn-borrar");
 
     botonMas.addEventListener("click", () => cambiarCantidad(item.id, 1));
@@ -450,7 +464,8 @@ function obtenerDesgloseFacturaActual() {
 
   const selectDesc = document.getElementById("select-descuento");
   const descuentoId = selectDesc ? selectDesc.value : "";
-  const descObj = descuentoId === '__puntual__' ? descuentoPuntualActual : descuentosCatalogo.find(d => String(d.id) === String(descuentoId));
+  const historico = descuentoHistoricoVigente();
+  const descObj = descuentoId === '__puntual__' ? descuentoPuntualActual : historico?.id === descuentoId ? historico : descuentosCatalogo.find(d => d.disponible !== false && String(d.id) === String(descuentoId));
 
   let montoDescuento = 0;
   if (descObj && totalBruto > 0) {
@@ -468,6 +483,7 @@ function obtenerDesgloseFacturaActual() {
 }
 
 function calcularTotales() {
+  actualizarResumenPOS();
   const { subtotal, iva, montoDescuento, total } = obtenerDesgloseFacturaActual();
   subtotalValor.textContent = `$${subtotal.toLocaleString("es-CO")}`;
   ivaValor.textContent = `$${iva.toLocaleString("es-CO")}`;

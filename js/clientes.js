@@ -8,11 +8,11 @@ function abrirClienteModal(cliente = null, desdePOS = false) {
   if (clienteGuardando || clientesEnCarga) return;
   clienteDesdePOS = desdePOS;
   abrirFormularioModal('cliente-form', cliente ? 'Editar cliente' : 'Nuevo cliente', !cliente);
-  if (cliente) ['id', 'nombre', 'telefono', 'correo'].forEach(campo => document.getElementById(`cliente-${campo}`).value = cliente[campo]);
+  if (cliente) ['id', 'nombre', 'tipo', 'documento', 'telefono', 'correo', 'direccion'].forEach(campo => document.getElementById(`cliente-${campo}`).value = cliente[campo]);
 }
 
 function nombreCliente(id) {
-  return clientes.find(c => c.id === String(id))?.nombre || (id ? `Cliente ${id}` : "Sin cliente");
+  return clientes.find(c => c.id === String(id))?.nombre || (id ? 'Cliente no disponible' : "Consumidor final");
 }
 
 function actualizarSelectClientes() {
@@ -28,35 +28,26 @@ function actualizarSelectClientes() {
 
 function renderClientes() {
   const body = document.getElementById('clientes-table-body');
+  body.closest('table').classList.add('tabla-fichas');
   const busqueda = document.getElementById('buscar-cliente').value.toLowerCase().trim();
   body.replaceChildren();
-  clientes.filter(c => [c.nombre, c.telefono, c.correo].some(v => v.toLowerCase().includes(busqueda))).forEach(c => {
+  paginarListado('clientes', clientes.filter(c => [c.nombre, c.telefono, c.correo].some(v => v.toLowerCase().includes(busqueda))), busqueda, body.closest('.table-responsive'), renderClientes).forEach(c => {
     const tr = document.createElement('tr');
-    [c.nombre, c.telefono, c.correo].forEach(valor => {
-      const td = document.createElement('td');
-      td.textContent = valor;
-      tr.appendChild(td);
-    });
-    const acciones = document.createElement('td');
-    const editar = document.createElement('button');
-    editar.type = 'button'; editar.className = 'btn-editar'; editar.textContent = 'Editar';
-    editar.disabled = clienteGuardando;
-    editar.addEventListener('click', () => {
-      if (clienteGuardando) return;
-      abrirClienteModal(c);
-    });
-    const eliminar = document.createElement('button');
-    eliminar.type = 'button'; eliminar.className = 'btn-eliminar'; eliminar.textContent = 'Eliminar';
-    eliminar.disabled = clienteGuardando;
-    eliminar.addEventListener('click', () => eliminarCliente(c));
-    acciones.append(editar, eliminar); tr.appendChild(acciones); body.appendChild(tr);
+    const nombre = celdaVista(tr, c.nombre);
+    nombre.append(document.createElement('br'), insigniaEstado('neutro', c.tipo === 'empresa' ? 'Empresa' : 'Persona'));
+    celdaVista(tr, c.documento);
+    celdaVista(tr, [c.telefono || '—', c.correo || '—'].join(' · '));
+    filaConDetalle(tr, () => fichaContacto(c, 'cliente'));
+    [...tr.cells].forEach((td,i)=>td.dataset.label=['Cliente','Documento','Contacto',''][i]);
+    body.appendChild(tr);
   });
+  if (!body.rows.length) { const td=body.insertRow().insertCell(); td.colSpan=4; td.className='tabla-vacia'; td.textContent='No hay clientes que coincidan con la búsqueda.'; }
 }
 
 function bloquearClientes(bloqueado) {
   clienteGuardando = bloqueado;
   document.getElementById('clientes-estado').textContent = bloqueado ? 'Guardando cambios...' : '';
-  document.querySelectorAll('#vista-clientes button, #cliente-form input, #cliente-form button').forEach(e => e.disabled = bloqueado);
+  document.querySelectorAll('#vista-clientes button, #cliente-form input, #cliente-form select, #cliente-form button').forEach(e => e.disabled = bloqueado);
   indicarFormularioOcupado('cliente-form', bloqueado);
   renderClientes();
 }
@@ -74,7 +65,7 @@ async function cargarClientes() {
     try {
       const datos = await apiGet('clientes');
       if (!Array.isArray(datos)) throw new Error('La API debe devolver una lista de clientes.');
-      clientes = datos.map(c => ({ id: String(c.id), nombre: String(c.nombre ?? ''), telefono: String(c.telefono ?? ''), correo: String(c.correo ?? '') }));
+      clientes = datos.map(c => ({ ...c, id: String(c.id), nombre: String(c.nombre ?? ''), telefono: String(c.telefono ?? ''), correo: String(c.correo ?? '') }));
       clientesCargados = true;
       renderClientes(); actualizarSelectClientes();
       estado.textContent = estadoPos.textContent = '';
@@ -99,7 +90,7 @@ async function guardarCliente(event) {
   const existente = clientes.some(c => c.id === idInput.value);
   // Conservar UUID si create guarda el registro pero se pierde su respuesta.
   idInput.value = idInput.value || crypto.randomUUID();
-  const cliente = { id: idInput.value, nombre, telefono: document.getElementById('cliente-telefono').value.trim(), correo: document.getElementById('cliente-correo').value.trim() };
+  const cliente = { tipo: document.getElementById('cliente-tipo').value, documento: document.getElementById('cliente-documento').value.trim(), direccion: document.getElementById('cliente-direccion').value.trim(), id: idInput.value, nombre, telefono: document.getElementById('cliente-telefono').value.trim(), correo: document.getElementById('cliente-correo').value.trim() };
   bloquearClientes(true);
   try {
     let guardado;
@@ -111,6 +102,7 @@ async function guardarCliente(event) {
       if (!guardado) throw error;
     }
     const actualizado = {
+      ...cliente, ...guardado,
       id: cliente.id,
       nombre: String(guardado?.nombre ?? cliente.nombre),
       telefono: String(guardado?.telefono ?? cliente.telefono),
@@ -122,6 +114,7 @@ async function guardarCliente(event) {
     actualizarSelectClientes();
     if (clienteDesdePOS) {
       document.getElementById('select-cliente').value = actualizado.id;
+      actualizarResumenPOS();
       guardarBorradorVenta();
     }
     // Cerrar después de liberar aria-busy en finally, sin borrar campos si falla.

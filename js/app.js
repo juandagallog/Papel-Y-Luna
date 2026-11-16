@@ -203,7 +203,34 @@ function abrirDetalleFaltante(f) {
     try {await apiPost('faltantes','update',{id:f.id,estado:'resuelto'});await cargarFaltantes();mostrarNotificacion('Faltante resuelto.','exito');}
     catch(error){mostrarNotificacion(error.message,'error');}
   }}]:[];
+  if (f.estado === 'pendiente' && window.usuarioActual?.esAdmin) {
+    acciones.push({ texto:'Comprar producto', clase:'btn-primary', ejecutar:()=>prepararCompraDesdeFaltante(f) });
+  }
   abrirFicha(f.productoNombre||f.descripcion,[datosFicha([['Tipo',f.tipo==='agotado'?'Agotado':'Inexistente'],['Cantidad solicitada',f.cantidadSolicitada],['Proveedor',f.proveedorNombre],['Fecha',fechaVista(f.fecha)],['Estado',f.estado==='resuelto'?'Resuelto':'Pendiente'],['Notas',f.notas]])],acciones);
+}
+async function prepararCompraDesdeFaltante(f) {
+  if (!window.usuarioActual?.esAdmin) return;
+  document.getElementById('btn-nav-compras').click();
+  await cargarGestion('proveedores');
+  actualizarProductosCompra();
+
+  document.getElementById('compra-cantidad').value = f.cantidadSolicitada;
+  if (f.proveedorId && gestiones.proveedores.registros.some(p => p.id === String(f.proveedorId))) {
+    document.getElementById('compra-proveedor').value = String(f.proveedorId);
+  }
+
+  const producto = productos.find(p => p.id === String(f.productoId || ''));
+  if (producto) {
+    document.getElementById('compra-producto').value = producto.id;
+    document.getElementById('compra-costo').value = producto.costo;
+    abrirFormularioModal('compra-form', 'Registrar compra');
+    return;
+  }
+
+  abrirFormularioModal('compra-form', 'Registrar compra');
+  document.getElementById('btn-nuevo-producto-compra').click();
+  document.getElementById('product-name').value = f.descripcion || f.productoNombre || '';
+  mostrarNotificacion('Primero crea el producto. Al guardarlo quedará seleccionado en la compra con la cantidad solicitada.', 'informacion');
 }
 async function registrarFaltante(event) {
   event.preventDefault();

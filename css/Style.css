@@ -1718,7 +1718,38 @@ button:disabled { cursor:not-allowed; }
   .nav-more-items { position:fixed; bottom:calc(78px + env(safe-area-inset-bottom)); left:12px; right:12px; max-height:calc(100dvh - 180px); overflow-y:auto; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:12px; background:var(--color-card); border:1px solid var(--color-border); border-radius:14px; box-shadow:var(--shadow); }
   .nav-more:not([open]) .nav-more-items { display:none; }
   .nav-more-items .nav-btn { flex-direction:row; justify-content:flex-start; padding:12px; font-size:14px; }
-  .acceso-venta-movil { bottom:calc(86px + env(safe-area-inset-bottom)); }
+  .acceso-venta-movil {
+    bottom:calc(76px + env(safe-area-inset-bottom));
+    left:0;
+    right:0;
+    min-height:58px;
+    border-radius:0;
+    border-top:1px solid var(--color-border);
+    padding:10px 18px;
+    box-shadow:0 -4px 12px var(--color-shadow);
+  }
+  #catalogo-productos { padding-bottom:0; overflow:visible; }
+  #catalogo-productos .product-grid {
+    grid-auto-rows:max-content;
+    align-content:start;
+    height:var(--altura-lista-pos-movil, 45dvh);
+    max-height:var(--altura-lista-pos-movil, 45dvh);
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-y;
+    padding-bottom:0;
+    scrollbar-gutter:stable;
+  }
+  #catalogo-productos .product-grid * { touch-action:pan-y; }
+  #catalogo-productos .pos-list-container { min-height:max-content; overflow:visible; }
+  .pos-list-actions { width:auto; margin-left:auto; gap:6px; }
+  .pos-list-actions .pos-list-input { width:42px; min-height:36px; padding:4px; }
+  .pos-list-actions .pos-list-btn,
+  .pos-list-actions .btn-editar { min-height:36px; padding:6px 10px; font-size:13px; }
+  .acceso-venta-movil { font-size:13px; }
+  .acceso-venta-movil,
+  .acceso-venta-movil * { color:var(--color-on-primary); }
   body.modal-abierto .header-nav, body.modal-abierto .acceso-venta-movil, body.teclado-abierto .header-nav, body.teclado-abierto .acceso-venta-movil { visibility:hidden; }
   .paginacion { justify-content:space-between; gap:10px 6px; }
   .paginacion > span { flex-basis:100%; }

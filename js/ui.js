@@ -136,6 +136,25 @@ document.addEventListener('DOMContentLoaded', () => {
   menuExtra.addEventListener('click', event => {
     if (pantallaPequena.matches && event.target.closest('.nav-btn')) menuExtra.open = false;
   });
+  // La lista del POS termina físicamente antes de la barra fija de factura.
+  const ajustarAlturaListaPos = () => requestAnimationFrame(() => {
+    const vista = document.getElementById('vista-pos');
+    const lista = document.getElementById('product-grid');
+    const accesoFactura = document.getElementById('acceso-venta-movil');
+    if (!pantallaPequena.matches || vista.classList.contains('vista-oculta')) {
+      lista.style.removeProperty('--altura-lista-pos-movil');
+      return;
+    }
+    const inicio = lista.getBoundingClientRect().top;
+    const fin = accesoFactura.getBoundingClientRect().top;
+    if (fin > inicio) lista.style.setProperty('--altura-lista-pos-movil', `${Math.max(120, fin - inicio - 8)}px`);
+  });
+  window.addEventListener('resize', ajustarAlturaListaPos);
+  window.visualViewport?.addEventListener('resize', ajustarAlturaListaPos);
+  pantallaPequena.addEventListener('change', ajustarAlturaListaPos);
+  document.getElementById('btn-nav-pos').addEventListener('click', ajustarAlturaListaPos);
+  new ResizeObserver(ajustarAlturaListaPos).observe(document.getElementById('catalogo-productos'));
+  ajustarAlturaListaPos();
   let alturaMovil = window.visualViewport?.height || innerHeight;
   const adaptarTeclado = () => {
     const escribiendo = document.activeElement?.matches('input:not([type="button"]):not([type="submit"]),textarea');
